@@ -112,18 +112,32 @@
       if (r.sesion && S.sesion) {   // el motor entrega (o renueva) la sesión larga
         S.sesion.token = r.sesion.token; S.sesion.exp = r.sesion.exp; guardarSesion(S.sesion);
       }
-      if (r.estado) { S.datos = r.estado; S.fresco = Date.now(); guardarCache(r.estado); }
+      if (r.estado) { S.datos = r.estado; S.fresco = Date.now(); guardarCache(r.estado); marcarSync(); }
       return r.datos;
     });
   }
 
+  function pintarSync() { var el = document.getElementById('sync'); if (el) el.textContent = textoSync(); }
+  function marcarSync() { S.horaSync = Date.now(); try { localStorage.setItem('iptv_cache_hora', String(S.horaSync)); } catch (e) { } }
+  function textoSync() {
+    if (DEMO) return '';
+    if (S.actualizando) return 'Actualizando…';
+    var t = S.horaSync || Number(localStorage.getItem('iptv_cache_hora') || 0);
+    if (!t) return '';
+    var d = new Date(t), hoy = new Date();
+    var h = d.toLocaleTimeString('es-CR', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s/g, ' ');
+    var mismoDia = d.toDateString() === hoy.toDateString();
+    return 'Actualizado ' + (mismoDia ? 'a las ' + h : 'el ' + d.toLocaleDateString('es-CR', { day: 'numeric', month: 'short' }) + ', ' + h);
+  }
   function guardarCache(d) { if (DEMO) return; try { localStorage.setItem('iptv_cache', JSON.stringify(d)); } catch (e) { } }
   function leerCache() { if (DEMO) return null; try { return JSON.parse(localStorage.getItem('iptv_cache')); } catch (e) { return null; } }
 
   function refrescar() {
     // Si el servidor acaba de mandar los datos junto con lo guardado, no se piden otra vez
     if (S.fresco && Date.now() - S.fresco < 3000) { S.fresco = 0; return Promise.resolve(S.datos); }
-    return api('estado').then(function (d) { S.datos = d; guardarCache(d); return d; });
+    S.actualizando = true; pintarSync();
+    return api('estado').then(function (d) { S.datos = d; guardarCache(d); marcarSync(); S.actualizando = false; pintarSync(); return d; },
+      function (e) { S.actualizando = false; pintarSync(); throw e; });
   }
 
   /* ---------------- Sesión con Google ---------------- */
@@ -348,7 +362,8 @@
     var nVenc = lista.filter(function (c) { return c.estado === 'Vencido'; }).length;
     var nPor = lista.filter(function (c) { return c.estado === 'Por vencer'; }).length;
     return banner() +
-      '<div class="top"><div><div class="fecha">' + esc(fechaLarga()) + '</div><h1>Inicio</h1></div><div class="acciones-top">' +
+      '<div class="top"><div><div class="fecha">' + esc(fechaLarga()) + '</div><h1>Inicio</h1>' +
+      (DEMO ? '' : '<button id="sync" class="sync" aria-label="Actualizar ahora">' + esc(textoSync()) + '</button>') + '</div><div class="acciones-top">' +
       '<a class="icon-btn" href="#/ajustes" aria-label="Ajustes">' + ico('gear') + '</a>' +
       '<a class="icon-btn" href="#/alertas" aria-label="Alertas: ' + d.alertas.length + '">' + ico('bell') +
       (d.alertas.length ? '<span class="badge">' + d.alertas.length + '</span>' : '') + '</a></div></div>' +
@@ -834,6 +849,9 @@
         api('guardarControl', { sobreReal: numero(s), creditosPanel: numero(c) }).then(refrescar).then(function () { toast('Control guardado'); render(); }, function (e) { toast(e.message); });
       };
     }
+    if ($('sync')) $('sync').onclick = function () {
+      refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
+    };
     if (ruta === 'deuda' && $('deuda-ok')) {
       todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = $('deuda-monto').value; render(); }; });
       if (S.deuda.monto) $('deuda-monto').value = S.deuda.monto;

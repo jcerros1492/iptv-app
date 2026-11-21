@@ -1,9 +1,7 @@
 {
-  "version": "1.4",
+  "version": "1.5",
   "fecha": "2026-11-21",
   "cambios": [
-    "Registrar pago de deudas",
-    "Face ID mejorado",
-    "'Sin respuesta' quita la alerta por 3 días"
+    "Inicio muestra la hora de la última actualización (tóquela para actualizar)"
   ]
 }

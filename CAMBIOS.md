@@ -4,6 +4,11 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 1.5 · 21 nov 2026
+- Inicio muestra "Actualizado a las 2:34 p. m." debajo del título. Mientras trae datos dice
+  "Actualizando…". Tocar ese texto actualiza en el momento.
+- Motor: no.
+
 ## 1.4 · 21 nov 2026
 - Al anotar una respuesta ("Sin respuesta" o "Va a renovar") la alerta del vencido se quita
   y vuelve a aparecer a los 3 días si todavía no ha pagado (con notificación ese día).

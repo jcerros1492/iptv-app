@@ -82,9 +82,14 @@ r = post('pagarDeuda',{usuario:'fval85', monto: debeF, forma:'SINPE', enSobre:tr
 var e1 = post('estado',{}).datos;
 chk('deuda pagada completa', r.ok && e1.clientes.find(c=>c.usuario==='fval85').debe===0 && Math.abs(e1.resumen.sobre - sobre0 - debeF) < 0.01 && !e1.alertas.some(a=>a.usuario==='fval85'));
 var debeJ = e1.clientes.find(c=>c.usuario==='JCerros14').debe;
-r = post('pagarDeuda',{usuario:'JCerros14', monto: 10000, forma:'Efectivo', enSobre:true});
+var idsJ = e1.cobros ? e1.cobros.filter(c=>c.Usuario==='JCerros14'&&c.Estado==='Pendiente').map(c=>c.ID) : [];
+var r0 = post('pagarDeuda',{usuario:'JCerros14', ids: idsJ.slice(0,2), monto: 13920, forma:'SINPE', enSobre:true});
+var eS = post('estado',{}).datos;
+chk('pagar 2 de 3 meses', r0.ok && Math.abs(eS.clientes.find(c=>c.usuario==='JCerros14').debe - (debeJ-13920))<0.01 && Math.abs(r0.datos.queda-(debeJ-13920))<0.01);
+debeJ = debeJ - 13920;
+r = post('pagarDeuda',{usuario:'JCerros14', monto: 3000, forma:'Efectivo', enSobre:true});
 var e2 = post('estado',{}).datos;
-chk('abono deja saldo', r.ok && Math.abs(e2.clientes.find(c=>c.usuario==='JCerros14').debe - (debeJ-10000)) < 0.01 && Math.abs(r.datos.queda - (debeJ-10000))<0.01);
+chk('abono deja saldo', r.ok && Math.abs(e2.clientes.find(c=>c.usuario==='JCerros14').debe - (debeJ-3000)) < 0.01 && Math.abs(r.datos.queda - (debeJ-3000))<0.01);
 chk('pago de deuda devuelve estado nuevo', !!r.estado);
 // Sin respuesta calla la alerta
 r = post('respuesta',{usuario:'AlexisSegura',respuesta:'Sin respuesta'});

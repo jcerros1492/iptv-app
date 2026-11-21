@@ -479,9 +479,12 @@ function accionPagarDeuda(db, config, p, hoy, correo) {
   var socio = nombreSocio(config, correo);
   var monto = numero(p.monto);
   if (!(monto > 0)) throw new Error('Escriba el monto que pagó.');
-  var deudas = db.cobros.filter(function (c) { return c.Usuario === p.usuario && c.Estado === 'Pendiente'; })
-    .sort(function (a, b) { return a.Fecha < b.Fecha ? -1 : 1; });
-  if (!deudas.length) throw new Error(p.usuario + ' no tiene deudas pendientes.');
+  var deudas = db.cobros.filter(function (c) {
+    return c.Usuario === p.usuario && c.Estado === 'Pendiente' && (!p.ids || !p.ids.length || p.ids.indexOf(c.ID) >= 0);
+  }).sort(function (a, b) { return a.Fecha < b.Fecha ? -1 : 1; });
+  if (!deudas.length) throw new Error(p.ids && p.ids.length ? 'Escoja qué va a pagar.' : p.usuario + ' no tiene deudas pendientes.');
+  var totalTodo = db.cobros.filter(function (c) { return c.Usuario === p.usuario && c.Estado === 'Pendiente'; })
+    .reduce(function (t, d) { return t + numero(d.Monto); }, 0);
   var cambios = [], resto = monto, tolerancia = numero(config.tolerancia);
   var total = deudas.reduce(function (t, d) { return t + numero(d.Monto); }, 0);
   if (monto >= total - tolerancia) resto = total;            // dentro del margen: se salda todo
@@ -502,11 +505,13 @@ function accionPagarDeuda(db, config, p, hoy, correo) {
     Dispositivos: '', Meses: 0, 'Regalía': 0, 'Créditos': 0, Monto: monto, Estado: 'Pagado',
     'Forma de pago': p.forma || 'SINPE', 'Cobró': socio, 'Tipo de cambio': '', Esperado: total, 'Vence nuevo': '',
     'En sobre': p.enSobre === false ? 'No' : 'Sí', Comprobante: '',
-    Nota: monto >= total - tolerancia ? 'Pagó toda la deuda' : 'Abono: queda debiendo ' + colones(total - monto)
+    Nota: (deudas.length === 1 ? 'Deuda del ' + fechaCorta(deudas[0].Fecha) : 'Deudas del ' + deudas.map(function (d) { return fechaCorta(d.Fecha); }).join(', ')) +
+      (monto >= total - tolerancia ? '' : ' · abono, faltan ' + colones(total - monto))
   };
   cambios.unshift({ tabla: 'Cobros', op: 'agregar', fila: fila });
   cambios.push({ tabla: 'Accesos', op: 'agregar', fila: { Fecha: hoy, Usuario: socio, 'Acción': 'Pago de deuda', Detalle: p.usuario + ' ' + colones(monto) } });
-  return { resultado: { ok: true, queda: Math.max(0, Math.round((total - monto) * 100) / 100) }, cambios: cambios };
+  var pagadoDeuda = monto >= total - tolerancia ? total : monto;
+  return { resultado: { ok: true, queda: Math.max(0, Math.round((totalTodo - pagadoDeuda) * 100) / 100) }, cambios: cambios };
 }
 
 function accionRespuesta(db, config, p, hoy, correo) {

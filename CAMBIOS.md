@@ -4,6 +4,15 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 1.7 · 21 nov 2026
+- Pago de deuda: se marcan los meses que paga (ej. 2 de 3). El monto se suma solo; queda
+  debiendo lo que no marcó.
+- Ficha del cliente: botón para copiar el usuario (sin Face ID).
+- Contraseñas: después de confirmar con Face ID, durante 5 minutos se pueden ver o copiar
+  otras sin volver a pedirlo. La contraseña se vuelve a ocultar sola a los 30 segundos.
+- Copiar contraseña funciona bien en iPhone.
+- Motor: SÍ → copiar Logica.gs a Apps Script y hacer Nueva versión.
+
 ## 1.6 · 21 nov 2026
 - iPhone: al volver a la app, el botón de Face ID a veces no hacía nada (quedaba una solicitud
   colgada). Ahora se cancela la anterior y Face ID se pide solo al tocar el botón.

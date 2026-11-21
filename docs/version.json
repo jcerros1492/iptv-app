@@ -1,7 +1,9 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "fecha": "2026-11-21",
   "cambios": [
-    "Face ID responde siempre al tocar el botón en iPhone"
+    "Escoger qué meses paga una deuda",
+    "Copiar el usuario",
+    "Ver contraseñas más rápido"
   ]
 }

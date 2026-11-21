@@ -303,8 +303,21 @@
   function confirmarIdentidad() {
     var b = bloqueo();
     if (!b) return Promise.resolve(true);
-    if (b.cred) return verificarBiometria().then(function () { return true; }, function () { return pedirPin(b); });
-    return pedirPin(b);
+    // Una vez confirmado, no se vuelve a pedir durante 5 minutos (para ver varias contraseñas seguidas)
+    if (S.identidadHasta && Date.now() < S.identidadHasta) return Promise.resolve(true);
+    var ok = function () { S.identidadHasta = Date.now() + 5 * 60000; return true; };
+    if (b.cred) return verificarBiometria().then(ok, function () { return pedirPin(b).then(ok); });
+    return pedirPin(b).then(ok);
+  }
+  /** Copiar texto. En iPhone hay que empezar a copiar en el mismo toque, aunque el texto llegue después. */
+  function copiarTexto(textoOPromesa) {
+    var p = Promise.resolve(textoOPromesa);
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        return navigator.clipboard.write([new ClipboardItem({ 'text/plain': p.then(function (t) { return new Blob([t], { type: 'text/plain' }); }) })]);
+      }
+    } catch (e) { }
+    return p.then(function (t) { return navigator.clipboard.writeText(t); });
   }
   function pedirPin(b) {
     var p = window.prompt('Escriba su PIN');
@@ -436,7 +449,8 @@
     var chipE = c.estado === 'Vencido' ? '<span class="chip rojo">Vencido desde ' + fechaCorta(c.vence) + '</span>' :
       c.vence ? '<span class="chip ' + (c.estado === 'Por vencer' ? 'beige' : '') + '">' + (c.estado === 'Excliente' ? 'Excliente · venció ' : 'Vence el ') + fechaCorta(c.vence) + '</span>' : '<span class="chip">' + esc(c.estado) + '</span>';
     return barra('Ficha del cliente', '#/clientes') +
-      '<div class="ficha-nombre">' + esc(c.usuario) + '</div><div class="chips">' + chipE + (c.idPanel ? '<span class="chip">ID ' + esc(c.idPanel) + '</span>' : '') +
+      '<div class="ficha-nombre" style="display:flex;align-items:center;gap:6px">' + esc(c.usuario) +
+        '<button class="icon-btn plano" id="usr-copiar" aria-label="Copiar usuario">' + ico('copiar') + '</button></div><div class="chips">' + chipE + (c.idPanel ? '<span class="chip">ID ' + esc(c.idPanel) + '</span>' : '') +
       (c.nombre ? '<span class="chip">' + esc(c.nombre) + '</span>' : '') + '</div>' +
       (c.debe > 0 ? '<div class="aviso rojo" style="margin-top:14px">' + ico('alerta') + '<div style="flex:1"><b>Debe ' + colones(c.debe) + '</b>Cobros pendientes registrados en la app.</div>' +
         '<a class="btn chico" style="align-self:center;white-space:nowrap" href="#/deuda/' + encodeURIComponent(u) + '">Registrar pago</a></div>' : '') +
@@ -648,21 +662,32 @@
   /* --- Pago de deuda --- */
   function pDeuda(u) {
     var c = cliente(u); if (!c) return barra('Pago de deuda', '#/inicio') + '<div class="vacio">No se encontró ' + esc(u) + '</div>';
-    if (!S.deuda || S.deuda.usuario !== u) S.deuda = { usuario: u, forma: 'SINPE', enSobre: true };
+    var pend = S.datos.cobros.filter(function (x) { return x.Usuario === u && x.Estado === 'Pendiente'; })
+      .sort(function (a, b) { return a.Fecha < b.Fecha ? -1 : 1; });
+    if (!S.deuda || S.deuda.usuario !== u) S.deuda = { usuario: u, forma: 'SINPE', enSobre: true, ids: pend.map(function (x) { return x.ID; }), monto: null };
     var d = S.deuda;
-    var pend = S.datos.cobros.filter(function (x) { return x.Usuario === u && x.Estado === 'Pendiente'; });
+    var sel = pend.filter(function (x) { return d.ids.indexOf(x.ID) >= 0; });
+    var totalSel = sel.reduce(function (t, x) { return t + numero(x.Monto); }, 0);
+    var monto = d.monto != null ? d.monto : totalSel;
+    if (!(c.debe > 0)) return barra('Pago de deuda', '#/cliente/' + encodeURIComponent(u)) + '<div class="ficha-nombre">' + esc(u) + '</div><div class="card" style="margin-top:14px"><div class="vacio">' + esc(u) + ' no debe nada.</div></div>';
     return barra('Pago de deuda', '#/cliente/' + encodeURIComponent(u)) +
       '<div class="ficha-nombre">' + esc(u) + '</div>' +
-      (c.debe > 0 ?
-        '<div class="card" style="margin-top:14px">' + pend.map(function (x) {
-          return '<div class="dato"><span class="l">' + fechaCorta(x.Fecha) + (x.Nota ? '<br><small>' + esc(x.Nota) + '</small>' : '') + '</span><span class="v">' + colones(numero(x.Monto)) + '</span></div>';
-        }).join('') + '<div class="dato"><span class="l"><b>Total que debe</b></span><span class="v"><b>' + colones(c.debe) + '</b></span></div></div>' +
-        '<div class="etq">¿Cuánto pagó?</div><input id="deuda-monto" class="input" type="text" inputmode="decimal" value="' + numero(c.debe) + '">' +
-        '<div class="etq">Forma de pago</div><div class="opciones c2"><button class="op' + (d.forma === 'SINPE' ? ' sel' : '') + '" data-dforma="SINPE">SINPE</button><button class="op' + (d.forma === 'Efectivo' ? ' sel' : '') + '" data-dforma="Efectivo">Efectivo</button></div>' +
-        '<label class="check"><input type="checkbox" id="deuda-sobre"' + (d.enSobre ? ' checked' : '') + '>Ya está en el sobre BCR</label>' +
-        '<p class="nota">Si paga menos, queda debiendo la diferencia.</p>' +
-        '<button class="btn" id="deuda-ok" style="margin-top:6px">Guardar pago</button>'
-        : '<div class="card" style="margin-top:14px"><div class="vacio">' + esc(u) + ' no debe nada.</div></div>');
+      '<div class="etq">¿Qué va a pagar?</div><div class="card">' + pend.map(function (x) {
+        var on = d.ids.indexOf(x.ID) >= 0;
+        return '<label class="dato" style="cursor:pointer"><span class="l" style="display:flex;align-items:center;gap:12px">' +
+          '<input type="checkbox" data-deuda="' + esc(x.ID) + '"' + (on ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--texto)">' +
+          '<span>' + mesDeuda(x.Fecha) + '<br><small>' + fechaCorta(x.Fecha) + '</small></span></span><span class="v">' + colones(numero(x.Monto)) + '</span></label>';
+      }).join('') +
+      '<div class="dato"><span class="l"><b>A pagar ahora</b>' + (sel.length < pend.length ? '<br><small>Queda debiendo ' + colones(c.debe - totalSel) + '</small>' : '') + '</span><span class="v"><b>' + colones(totalSel) + '</b></span></div></div>' +
+      '<div class="etq">¿Cuánto pagó?</div><input id="deuda-monto" class="input" type="text" inputmode="decimal" value="' + numero(monto) + '">' +
+      '<div class="etq">Forma de pago</div><div class="opciones c2"><button class="op' + (d.forma === 'SINPE' ? ' sel' : '') + '" data-dforma="SINPE">SINPE</button><button class="op' + (d.forma === 'Efectivo' ? ' sel' : '') + '" data-dforma="Efectivo">Efectivo</button></div>' +
+      '<label class="check"><input type="checkbox" id="deuda-sobre"' + (d.enSobre ? ' checked' : '') + '>Ya está en el sobre BCR</label>' +
+      '<p class="nota">Marque los meses que paga. Si paga menos de lo marcado, queda debiendo la diferencia.</p>' +
+      '<button class="btn" id="deuda-ok" style="margin-top:6px"' + (sel.length ? '' : ' disabled') + '>Guardar pago</button>';
+  }
+  function mesDeuda(f) {
+    var m = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
+    var p = String(f).split('-'); return p.length === 3 ? 'Mes de ' + m[Number(p[1]) - 1] : esc(f);
   }
 
   /* --- Ajustes --- */
@@ -765,16 +790,35 @@
     }
     if (ruta === 'cliente') {
       var u = arg;
-      var mostrar = function (accion) {
+      S.pw = S.pw || {};
+      var traerPw = function () {
+        // Se guarda solo en la memoria mientras la app está abierta (nunca en el celular)
+        if (S.pw[u] && Date.now() - S.pw[u].t < 5 * 60000) return Promise.resolve(S.pw[u].v);
         return confirmarIdentidad().then(function () { return api('verContrasena', { usuario: u }); }).then(function (r) {
-          if (accion === 'ver') $('pw').textContent = r.contrasena;
-          if (accion === 'copiar') navigator.clipboard.writeText(r.contrasena).then(function () { toast('Contraseña copiada'); });
-          if (accion === 'enviar') window.open('https://wa.me/' + telefonoWhatsApp(cliente(u).telefono) + '?text=' + encodeURIComponent(mensajeAcceso(u, r.contrasena)), '_blank');
-        }, function (e) { if (e && e.message !== 'cancelado') toast(e.message); });
+          S.pw[u] = { v: r.contrasena, t: Date.now() }; return r.contrasena;
+        });
       };
-      if ($('pw-ver')) $('pw-ver').onclick = function () { mostrar('ver'); };
-      if ($('pw-copiar')) $('pw-copiar').onclick = function () { mostrar('copiar'); };
-      if ($('pw-enviar')) $('pw-enviar').onclick = function () { mostrar('enviar'); };
+      var error = function (e) { if (e && e.message !== 'cancelado') toast(e.message || 'No se pudo'); };
+      if ($('pw-ver')) $('pw-ver').onclick = function () {
+        if ($('pw').dataset.visible === '1') { $('pw').textContent = '••••••••'; $('pw').dataset.visible = ''; return; }
+        $('pw').textContent = '…';
+        traerPw().then(function (v) {
+          $('pw').textContent = v; $('pw').dataset.visible = '1';
+          clearTimeout(S.pwTimer);
+          S.pwTimer = setTimeout(function () { var el = document.getElementById('pw'); if (el) { el.textContent = '••••••••'; el.dataset.visible = ''; } }, 30000);
+        }, function (e) { $('pw').textContent = '••••••••'; error(e); });
+      };
+      if ($('pw-copiar')) $('pw-copiar').onclick = function () {
+        copiarTexto(traerPw()).then(function () { toast('Contraseña copiada'); }, error);
+      };
+      if ($('pw-enviar')) $('pw-enviar').onclick = function () {
+        traerPw().then(function (v) {
+          window.open('https://wa.me/' + telefonoWhatsApp(cliente(u).telefono) + '?text=' + encodeURIComponent(mensajeAcceso(u, v)), '_blank');
+        }, error);
+      };
+      if ($('usr-copiar')) $('usr-copiar').onclick = function () {
+        copiarTexto(u).then(function () { toast('Usuario copiado: ' + u); }, function () { toast('No se pudo copiar'); });
+      };
       todos('[data-comp]', function (b) {
         b.onclick = function () {
           var x = S.datos.cobros.filter(function (c) { return c.ID === b.dataset.comp; })[0], c = cliente(u);
@@ -867,16 +911,25 @@
       refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
     };
     if (ruta === 'deuda' && $('deuda-ok')) {
-      todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = $('deuda-monto').value; render(); }; });
-      if (S.deuda.monto) $('deuda-monto').value = S.deuda.monto;
+      todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = numero($('deuda-monto').value); render(); }; });
+      todos('[data-deuda]', function (x) {
+        x.onchange = function () {
+          var id = x.dataset.deuda, i = S.deuda.ids.indexOf(id);
+          if (x.checked && i < 0) S.deuda.ids.push(id);
+          if (!x.checked && i >= 0) S.deuda.ids.splice(i, 1);
+          S.deuda.monto = null;    // el monto vuelve a ser la suma de lo marcado
+          render();
+        };
+      });
+      $('deuda-monto').oninput = function () { S.deuda.monto = numero(this.value); };
       $('deuda-sobre').onchange = function () { S.deuda.enSobre = this.checked; };
       $('deuda-ok').onclick = function () {
         var m = numero($('deuda-monto').value);
         if (!(m > 0)) { toast('Escriba el monto que pagó'); return; }
-        guardando(this, api('pagarDeuda', { usuario: arg, monto: m, forma: S.deuda.forma, enSobre: S.deuda.enSobre })).then(function (r) {
+        guardando(this, api('pagarDeuda', { usuario: arg, ids: S.deuda.ids, monto: m, forma: S.deuda.forma, enSobre: S.deuda.enSobre })).then(function (r) {
           return refrescar().then(function () {
             S.deuda = null;
-            toast(r.queda > 0 ? 'Abono guardado. Queda debiendo ' + colones(r.queda) : 'Deuda pagada ✓');
+            toast(r.queda > 0 ? 'Pago guardado. Queda debiendo ' + colones(r.queda) : 'Deuda pagada ✓');
             ir('#/cliente/' + encodeURIComponent(arg));
           });
         });

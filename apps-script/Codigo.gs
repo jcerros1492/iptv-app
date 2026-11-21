@@ -21,6 +21,7 @@
 
 var ZONA = 'America/Costa_Rica';
 var ESTADO_NUEVO_ = null;
+var SESION_NUEVA_ = null;
 var COLUMNAS_FECHA = { 'Fecha': 1, 'Vence': 1, 'Vence nuevo': 1, 'Fecha respuesta': 1, 'Creado': 1 };
 var TABLAS = {
   clientes: 'Clientes', cobros: 'Cobros', movimientos: 'Movimientos', config: 'Config',
@@ -35,12 +36,13 @@ function doGet() {
 
 function doPost(e) {
   try {
+    ESTADO_NUEVO_ = null; SESION_NUEVA_ = null;
     var req = JSON.parse(e.postData.contents);
     var correo = verificarUsuario_(req.token);
-    ESTADO_NUEVO_ = null;
     var datos = ejecutar_(req.accion, req.datos || {}, correo);
     var resp = { ok: true, datos: datos };
     if (ESTADO_NUEVO_) resp.estado = ESTADO_NUEVO_;   // la app ya no tiene que pedir todo otra vez
+    if (SESION_NUEVA_) resp.sesion = SESION_NUEVA_;
     return json_(resp);
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message || err) });
@@ -61,12 +63,52 @@ function prop_(nombre) {
 
 /* ============ Permisos: solo Jonathan y Fernando ============ */
 
+/*
+ * Sesión larga: la primera vez se entra con Google; el motor entrega una "llave de sesión"
+ * propia, firmada, que dura DIAS_SESION días y se renueva sola con el uso.
+ * El celular igual queda protegido con Face ID / huella / PIN.
+ * Para sacar a todos los celulares (por ejemplo si se pierde uno): en la hoja Config
+ * ponga la clave "cerrar_sesiones_antes" con la fecha de hoy (AAAA-MM-DD).
+ */
+var DIAS_SESION = 180;
+
+function firmaSesion_(texto) {
+  var firma = Utilities.computeHmacSha256Signature(Utilities.newBlob('sesion|' + texto).getBytes(), claveBytes_());
+  return Utilities.base64EncodeWebSafe(firma).replace(/=+$/, '');
+}
+
+function crearSesion_(correo) {
+  var ahora = Math.floor(Date.now() / 1000);
+  var cuerpo = Utilities.base64EncodeWebSafe(JSON.stringify({ c: correo, i: ahora, e: ahora + DIAS_SESION * 86400 })).replace(/=+$/, '');
+  return { token: 's1.' + cuerpo + '.' + firmaSesion_(cuerpo), exp: ahora + DIAS_SESION * 86400, emitida: ahora };
+}
+
+function verificarSesionPropia_(token) {
+  var partes = token.split('.');
+  if (partes.length !== 3 || firmaSesion_(partes[1]) !== partes[2]) throw new Error('Sesión vencida. Vuelva a entrar.');
+  var d = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(partes[1] + '==='.slice((partes[1].length + 3) % 4))).getDataAsString());
+  var ahora = Math.floor(Date.now() / 1000);
+  if (!(d.e > ahora)) throw new Error('Sesión vencida. Vuelva a entrar.');
+  var config = leerConfig(leerTabla_('Config'));
+  var permitidos = [String(config.correo_jonathan).toLowerCase(), String(config.correo_fernando).toLowerCase()];
+  if (permitidos.indexOf(d.c) < 0) throw new Error('Sesión vencida. Vuelva a entrar.');
+  var corte = config.cerrar_sesiones_antes ? String(config.cerrar_sesiones_antes).slice(0, 10) : '';
+  if (corte) {
+    var emitida = Utilities.formatDate(new Date(d.i * 1000), ZONA, 'yyyy-MM-dd');
+    if (emitida <= corte) throw new Error('Sesión vencida. Vuelva a entrar.');
+  }
+  // Renovar sola si ya tiene más de 7 días
+  if (ahora - d.i > 7 * 86400) SESION_NUEVA_ = crearSesion_(d.c);
+  return d.c;
+}
+
 function verificarUsuario_(token) {
   if (!token) throw new Error('Debe iniciar sesión.');
+  if (token.indexOf('s1.') === 0) return verificarSesionPropia_(token);
   var cache = CacheService.getScriptCache();
   var llave = 'tk_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token));
   var guardado = cache.get(llave);
-  if (guardado) return guardado;
+  if (guardado) { SESION_NUEVA_ = crearSesion_(guardado); return guardado; }
 
   var r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
   if (r.getResponseCode() !== 200) throw new Error('Sesión vencida. Vuelva a entrar.');
@@ -84,6 +126,7 @@ function verificarUsuario_(token) {
   }
   var segundos = Math.max(60, Math.min(3000, Number(info.exp) - Math.floor(Date.now() / 1000) - 60));
   cache.put(llave, correo, segundos);
+  SESION_NUEVA_ = crearSesion_(correo);   // cambiar la llave de Google por la sesión larga
   return correo;
 }
 
@@ -94,6 +137,9 @@ function ejecutar_(accion, datos, correo) {
   var hoy = hoy_();
   CORREO_ACTUAL_ = correo;
   switch (accion) {
+    case 'entrar':
+      registrarAcceso_(nombreSocio(leerConfig(leerTabla_('Config')), correo), 'Entró', 'Nuevo inicio de sesión');
+      return { ok: true };
     case 'estado': {
       var db = cargarDb_();
       var config = leerConfig(db.config);

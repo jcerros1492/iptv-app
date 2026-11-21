@@ -1,0 +1,7 @@
+{
+  "version": "1.2",
+  "fecha": "2026-11-21",
+  "cambios": [
+    "Ya no pide entrar con Google cada hora: la sesión dura 6 meses y se renueva sola"
+  ]
+}

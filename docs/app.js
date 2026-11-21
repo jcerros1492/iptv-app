@@ -109,6 +109,9 @@
         if (/Sesión vencida|Debe iniciar/.test(r.error)) { cerrarSesion(true); }
         throw new Error(r.error);
       }
+      if (r.sesion && S.sesion) {   // el motor entrega (o renueva) la sesión larga
+        S.sesion.token = r.sesion.token; S.sesion.exp = r.sesion.exp; guardarSesion(S.sesion);
+      }
       if (r.estado) { S.datos = r.estado; S.fresco = Date.now(); guardarCache(r.estado); }
       return r.datos;
     });
@@ -166,8 +169,14 @@
           var info = decodificarJWT(resp.credential);
           guardarSesion({ token: resp.credential, correo: String(info.email).toLowerCase(), nombre: info.given_name || info.name, exp: info.exp });
           S.desbloqueado = true; marcarActividad();
-          iniciarNotificaciones();
-          render();
+          $app.innerHTML = '<div class="cargando">Entrando…</div>';
+          api('entrar').then(function () {
+            iniciarNotificaciones();
+            render();
+          }, function (e) {
+            localStorage.removeItem('iptv_sesion'); S.sesion = null;
+            toast(e.message); render();
+          });
         }
       });
       google.accounts.id.renderButton(document.getElementById('g-btn'), { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', locale: 'es' });
@@ -604,7 +613,7 @@
       '<div class="dato"><span class="l">Notificaciones</span><span class="v"><button class="btn chico sec" id="notif">Activar en este celular</button></span></div></div>' +
       '<button class="btn sec" id="salir" style="margin-top:16px">Cerrar sesión</button>' +
       (DEMO ? '<button class="btn rojo" id="reiniciar" style="margin-top:10px">Reiniciar datos de demostración</button>' : '') +
-      '<p class="nota" style="text-align:center">App IPTV · versión ' + LOGICA_VERSION + (DEMO ? ' · modo demostración' : '') + '</p>';
+      '<p class="nota" style="text-align:center">App IPTV · versión ' + (window.APP_VERSION || LOGICA_VERSION) + (DEMO ? ' · modo demostración' : '') + '</p>';
   }
 
   /* ---------------- Enrutador ---------------- */
@@ -804,10 +813,41 @@
     }
   }
 
+
+  /* ---------------- Aviso de versión nueva ---------------- */
+
+  var VERSION_APP = window.APP_VERSION || '';
+  function revisarVersion() {
+    if (!VERSION_APP || !window.fetch) return;
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (v) {
+      if (!v || !v.version || v.version === VERSION_APP) return;
+      var el = document.getElementById('aviso-version'); if (!el) return;
+      el.innerHTML = '<span class="txt"><b>Hay una versión nueva (' + esc(v.version) + ')</b>' +
+        (v.cambios && v.cambios.length ? '<small>' + esc(v.cambios.join(' · ')) + '</small>' : '') + '</span>' +
+        '<button id="av-act">Actualizar</button><button class="cerrar" id="av-x" aria-label="Cerrar">✕</button>';
+      el.hidden = false;
+      document.getElementById('av-x').onclick = function () { el.hidden = true; };
+      document.getElementById('av-act').onclick = function () {
+        this.disabled = true; this.textContent = 'Actualizando…';
+        var listo = function () { location.reload(); };
+        var limpiar = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
+        var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.update(); })); }) : Promise.resolve();
+        Promise.all([limpiar, sw]).then(listo, listo);
+      };
+    }, function () { });
+  }
+  function avisarSiSeActualizo() {
+    if (!VERSION_APP) return;
+    var antes = localStorage.getItem('iptv_version');
+    if (antes && antes !== VERSION_APP) setTimeout(function () { toast('✓ App actualizada a la versión ' + VERSION_APP); }, 600);
+    localStorage.setItem('iptv_version', VERSION_APP);
+  }
+
   /* ---------------- Arranque ---------------- */
 
   window.addEventListener('hashchange', function () { window.scrollTo(0, 0); render(); });
   document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') revisarVersion();
     if (document.visibilityState === 'visible' && S.sesion) {
       if (necesitaDesbloqueo()) { S.desbloqueado = false; render(); }
       else if (S.datos) refrescar().then(function () { if (!/cobro\/|nuevo|mensaje/.test(location.hash)) render(); }, function () { });
@@ -820,4 +860,6 @@
   if (S.sesion && bloqueo()) S.desbloqueado = false; else if (S.sesion) S.desbloqueado = true;
   iniciarNotificaciones();
   render();
+  avisarSiSeActualizo();
+  revisarVersion();
 })();

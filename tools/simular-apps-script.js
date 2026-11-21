@@ -38,7 +38,7 @@ const ctx = {
     computeHmacSha256Signature:(v,k)=>toSigned(crypto.createHmac('sha256',toBuf(k)).update(toBuf(v)).digest()),
     newBlob:x=>({getBytes:()=>toSigned(Buffer.from(String(x),'utf8')),getDataAsString:()=>toBuf(x).toString('utf8')}),
     base64Encode:a=>toBuf(a).toString('base64'), base64Decode:s=>toSigned(Buffer.from(s,'base64')),
-    base64EncodeWebSafe:a=>toBuf(a).toString('base64url'), getUuid:()=>crypto.randomUUID(),
+    base64EncodeWebSafe:a=>(typeof a==='string'?Buffer.from(a,'utf8'):toBuf(a)).toString('base64url'), base64DecodeWebSafe:s=>toSigned(Buffer.from(s.replace(/=+$/,''),'base64url')), getUuid:()=>crypto.randomUUID(),
     DigestAlgorithm:{SHA_256:1}}
 };
 vm.createContext(ctx);
@@ -67,5 +67,14 @@ ctx.tareaManana(); r = post('estado',{}); chk('tarea mañana: AlexisSegura a exc
 chk('notificación registrada', sheets.Notificaciones.length>=1);
 r = post('respuesta',{usuario:'Milasolano06',respuesta:'Va a renovar'}); var e2 = post('estado',{});
 chk('guardar devuelve estado nuevo', !!r.estado && JSON.stringify(r.estado.clientes)===JSON.stringify(e2.datos.clientes) && r.estado.resumen.sobre===e2.datos.resumen.sobre);
+// Sesión larga
+r = post('entrar',{}, 'fval85@gmail.com'); chk('entrar con Google entrega sesión larga', r.ok && /^s1\./.test(r.sesion.token) && r.sesion.exp - Date.now()/1000 > 170*86400);
+var tok = r.sesion.token;
+r = post('estado',{}, tok); chk('sesión larga funciona', r.ok && r.datos.socio==='Fernando');
+var malo = tok.slice(0,-3) + (tok.slice(-3)==='AAA'?'BBB':'AAA');
+r = post('estado',{}, malo); chk('sesión alterada rechazada', !r.ok);
+var hoyCR = ctx.hoy_(); sheets.Config.push(['cerrar_sesiones_antes', hoyCR, '']);
+r = post('estado',{}, tok); chk('cerrar_sesiones_antes saca a todos', !r.ok && /vencida/.test(r.error));
+sheets.Config.pop();
 console.log(fallas? fallas+' con error':'Todo bien');
 process.exit(fallas?1:0);

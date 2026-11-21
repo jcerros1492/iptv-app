@@ -65,5 +65,7 @@ r = post('respuesta',{usuario:'YChaconV',respuesta:'No renueva'}); r = post('est
 r = post('tipoCambioManual',{venta:458}); r = post('estado',{}); chk('tipo de cambio manual', r.datos.tipoCambio===458);
 ctx.tareaManana(); r = post('estado',{}); chk('tarea mañana: AlexisSegura a excliente', r.datos.clientes.find(c=>c.usuario==='AlexisSegura').estado==='Excliente');
 chk('notificación registrada', sheets.Notificaciones.length>=1);
+r = post('respuesta',{usuario:'Milasolano06',respuesta:'Va a renovar'}); var e2 = post('estado',{});
+chk('guardar devuelve estado nuevo', !!r.estado && JSON.stringify(r.estado.clientes)===JSON.stringify(e2.datos.clientes) && r.estado.resumen.sobre===e2.datos.resumen.sobre);
 console.log(fallas? fallas+' con error':'Todo bien');
 process.exit(fallas?1:0);

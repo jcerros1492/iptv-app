@@ -1,5 +1,5 @@
 /* Permite instalar la app y abrirla rápido. Los datos siempre se piden en línea. */
-var VERSION = 'iptv-v2';
+var VERSION = 'iptv-v3';
 var ARCHIVOS = ['./', 'index.html', 'styles.css', 'app.js', 'logic.js', 'config.js', 'manifest.json', 'icons/icon-192.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(ARCHIVOS); }).then(function () { return self.skipWaiting(); }));

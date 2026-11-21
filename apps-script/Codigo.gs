@@ -20,6 +20,7 @@
  */
 
 var ZONA = 'America/Costa_Rica';
+var ESTADO_NUEVO_ = null;
 var COLUMNAS_FECHA = { 'Fecha': 1, 'Vence': 1, 'Vence nuevo': 1, 'Fecha respuesta': 1, 'Creado': 1 };
 var TABLAS = {
   clientes: 'Clientes', cobros: 'Cobros', movimientos: 'Movimientos', config: 'Config',
@@ -36,8 +37,11 @@ function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents);
     var correo = verificarUsuario_(req.token);
+    ESTADO_NUEVO_ = null;
     var datos = ejecutar_(req.accion, req.datos || {}, correo);
-    return json_({ ok: true, datos: datos });
+    var resp = { ok: true, datos: datos };
+    if (ESTADO_NUEVO_) resp.estado = ESTADO_NUEVO_;   // la app ya no tiene que pedir todo otra vez
+    return json_(resp);
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message || err) });
   }
@@ -85,8 +89,10 @@ function verificarUsuario_(token) {
 
 /* ============ Acciones ============ */
 
+var CORREO_ACTUAL_ = '';
 function ejecutar_(accion, datos, correo) {
   var hoy = hoy_();
+  CORREO_ACTUAL_ = correo;
   switch (accion) {
     case 'estado': {
       var db = cargarDb_();
@@ -131,6 +137,12 @@ function conCandado_(fn) {
     var res = fn(db, config);
     guardarCambios_(res.cambios || []);
     SpreadsheetApp.flush();
+    // Armar de una vez el estado actualizado (sin volver a leer la hoja)
+    try {
+      aplicarCambiosEnMemoria(db, res.cambios || []);
+      var cfg = leerConfig(db.config);
+      ESTADO_NUEVO_ = armarEstado(db, cfg, hoy_(), CORREO_ACTUAL_, tipoCambioActual_(db, cfg));
+    } catch (e) { ESTADO_NUEVO_ = null; }
     return res.resultado;
   } finally {
     candado.releaseLock();
@@ -187,7 +199,8 @@ function leerTabla_(nombre) {
 
 function cargarDb_() {
   var db = {};
-  for (var k in TABLAS) db[k] = leerTabla_(TABLAS[k]);
+  for (var k in TABLAS) if (k !== 'accesos') db[k] = leerTabla_(TABLAS[k]);
+  db.accesos = [];
   return db;
 }
 

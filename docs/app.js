@@ -109,12 +109,18 @@
         if (/Sesión vencida|Debe iniciar/.test(r.error)) { cerrarSesion(true); }
         throw new Error(r.error);
       }
+      if (r.estado) { S.datos = r.estado; S.fresco = Date.now(); guardarCache(r.estado); }
       return r.datos;
     });
   }
 
+  function guardarCache(d) { if (DEMO) return; try { localStorage.setItem('iptv_cache', JSON.stringify(d)); } catch (e) { } }
+  function leerCache() { if (DEMO) return null; try { return JSON.parse(localStorage.getItem('iptv_cache')); } catch (e) { return null; } }
+
   function refrescar() {
-    return api('estado').then(function (d) { S.datos = d; return d; });
+    // Si el servidor acaba de mandar los datos junto con lo guardado, no se piden otra vez
+    if (S.fresco && Date.now() - S.fresco < 3000) { S.fresco = 0; return Promise.resolve(S.datos); }
+    return api('estado').then(function (d) { S.datos = d; guardarCache(d); return d; });
   }
 
   /* ---------------- Sesión con Google ---------------- */
@@ -128,7 +134,7 @@
   }
   function guardarSesion(s) { S.sesion = s; localStorage.setItem('iptv_sesion', JSON.stringify(s)); }
   function cerrarSesion(silencioso) {
-    localStorage.removeItem('iptv_sesion'); S.sesion = null; S.datos = null;
+    localStorage.removeItem('iptv_sesion'); localStorage.removeItem('iptv_cache'); S.sesion = null; S.datos = null;
     if (!silencioso) toast('Sesión cerrada');
     render();
   }
@@ -615,6 +621,11 @@
     if (!S.sesion) S.sesion = leerSesion();
     if (!S.sesion) return pantallaEntrar();
     if (necesitaDesbloqueo()) return pantallaBloqueo();
+    if (!S.datos && leerCache()) {
+      // Mostrar al instante lo último guardado en este celular y actualizar por detrás
+      S.datos = leerCache();
+      refrescar().then(function () { if (!/cobro|nuevo|mensaje/.test(location.hash)) render(); }, function () { });
+    }
     if (!S.datos) {
       $app.innerHTML = '<div class="cargando">Cargando…</div>';
       refrescar().then(render, function (e) {

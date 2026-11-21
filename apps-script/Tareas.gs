@@ -146,7 +146,8 @@ function tareaManana() {
     if (c.dias === 3) avisos.push(c.usuario + ' vence en 3 días (' + fechaCorta(c.vence) + ')');
     else if (c.dias === 0) avisos.push(c.usuario + ' vence hoy');
     else if (c.dias === -1) avisos.push(c.usuario + ' venció ayer y no ha renovado');
-    else if (c.dias < -1 && c.respuesta === 'Sin respuesta') avisos.push(c.usuario + ' no ha respondido (vencido)');
+    else if (c.dias < -1 && c.respuesta === 'Sin respuesta' && c.fechaRespuesta &&
+             diasEntre(c.fechaRespuesta, hoy) === (numero(config.dias_reaviso) || 3)) avisos.push(c.usuario + ' sigue sin responder (vencido)');
   });
   if (avisos.length === 1) {
     notificar_('Cobro', avisos[0] + '. Toque para enviarle el mensaje.', '#/alertas');

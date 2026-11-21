@@ -81,6 +81,7 @@ var CONFIG_POR_DEFECTO = {
   tolerancia: 1000,
   redondeo: 50,
   dias_excliente: 30,
+  dias_reaviso: 3,
   tipo_cambio_respaldo: 455,
   regalia_3: 1, regalia_6: 2, regalia_12: 3,
   telefono_jonathan: '8669-1599',
@@ -168,6 +169,7 @@ function prepararClientes(db, hoy) {
       ultimoPago: ultimo[c.Usuario] || '',
       tieneContrasena: !!c['Contraseña'],
       respuesta: c.Respuesta || '',
+      fechaRespuesta: c['Fecha respuesta'] || '',
       nota: c.Nota || ''
     };
   });
@@ -298,10 +300,16 @@ function alertas(db, config, hoy, lista) {
   lista = lista || prepararClientes(db, hoy);
   lista.forEach(function (c) {
     if (c.estado === 'Excliente' || c.estado === 'Revendedor') return;
-    if (c.estado === 'Vencido') {
+    // Si ya se anotó una respuesta, la alerta se calla unos días y luego vuelve a aparecer
+    var esperar = numero(config.dias_reaviso) || 3;
+    var callado = c.respuesta && c.respuesta !== 'No renueva' && c.fechaRespuesta && diasEntre(c.fechaRespuesta, hoy) < esperar;
+    if (callado) {
+      // no se muestra todavía
+    } else if (c.estado === 'Vencido') {
       out.push({ tipo: 'Vencido', nivel: 'rojo', usuario: c.usuario,
         titulo: c.usuario + ' · vencido desde ' + fechaCorta(c.vence),
-        detalle: '¿Renueva? Toque para enviarle el mensaje' });
+        detalle: c.respuesta === 'Sin respuesta' ? 'Sigue sin responder. Toque para volver a escribirle' :
+          c.respuesta === 'Va a renovar' ? 'Dijo que iba a renovar. Toque para recordarle' : '¿Renueva? Toque para enviarle el mensaje' });
     } else if (c.dias !== null && c.dias <= 3) {
       out.push({ tipo: 'Por vencer', nivel: 'naranja', usuario: c.usuario,
         titulo: c.usuario + (c.dias === 0 ? ' vence hoy' : ' vence en ' + c.dias + (c.dias === 1 ? ' día' : ' días')),
@@ -462,6 +470,45 @@ function accionGuardarCliente(db, config, p, hoy, correo) {
   return { resultado: { ok: true, usuario: existente ? existente.Usuario : usuario, reactivado: !!existente }, cambios: cambios };
 }
 
+/**
+ * Pago de una deuda (cobros Pendientes). Entra la plata al sobre como un cobro "Pago de deuda"
+ * (sin meses ni créditos, porque ya se contaron cuando se renovó) y las deudas que cubre
+ * quedan "Saldado". Si paga menos, la deuda más vieja queda con el saldo que falta.
+ */
+function accionPagarDeuda(db, config, p, hoy, correo) {
+  var socio = nombreSocio(config, correo);
+  var monto = numero(p.monto);
+  if (!(monto > 0)) throw new Error('Escriba el monto que pagó.');
+  var deudas = db.cobros.filter(function (c) { return c.Usuario === p.usuario && c.Estado === 'Pendiente'; })
+    .sort(function (a, b) { return a.Fecha < b.Fecha ? -1 : 1; });
+  if (!deudas.length) throw new Error(p.usuario + ' no tiene deudas pendientes.');
+  var cambios = [], resto = monto, tolerancia = numero(config.tolerancia);
+  var total = deudas.reduce(function (t, d) { return t + numero(d.Monto); }, 0);
+  if (monto >= total - tolerancia) resto = total;            // dentro del margen: se salda todo
+  deudas.forEach(function (d) {
+    var m = numero(d.Monto);
+    if (resto <= 0) return;
+    if (resto >= m) {
+      cambios.push({ tabla: 'Cobros', op: 'actualizar', clave: 'ID', valor: d.ID, fila: { Estado: 'Saldado', Nota: [d.Nota, 'Pagado el ' + fechaCorta(hoy)].filter(Boolean).join(' · ') } });
+      resto -= m;
+    } else {
+      cambios.push({ tabla: 'Cobros', op: 'actualizar', clave: 'ID', valor: d.ID, fila: { Monto: Math.round((m - resto) * 100) / 100, Nota: [d.Nota, 'Abono ' + colones(resto) + ' el ' + fechaCorta(hoy)].filter(Boolean).join(' · ') } });
+      resto = 0;
+    }
+  });
+  var numComp = numero(config.ultimo_comprobante) + 1;
+  var fila = {
+    ID: nuevoId_('C', hoy, db.cobros) + 'd', Fecha: hoy, Usuario: p.usuario, Tipo: 'Pago de deuda',
+    Dispositivos: '', Meses: 0, 'Regalía': 0, 'Créditos': 0, Monto: monto, Estado: 'Pagado',
+    'Forma de pago': p.forma || 'SINPE', 'Cobró': socio, 'Tipo de cambio': '', Esperado: total, 'Vence nuevo': '',
+    'En sobre': p.enSobre === false ? 'No' : 'Sí', Comprobante: '',
+    Nota: monto >= total - tolerancia ? 'Pagó toda la deuda' : 'Abono: queda debiendo ' + colones(total - monto)
+  };
+  cambios.unshift({ tabla: 'Cobros', op: 'agregar', fila: fila });
+  cambios.push({ tabla: 'Accesos', op: 'agregar', fila: { Fecha: hoy, Usuario: socio, 'Acción': 'Pago de deuda', Detalle: p.usuario + ' ' + colones(monto) } });
+  return { resultado: { ok: true, queda: Math.max(0, Math.round((total - monto) * 100) / 100) }, cambios: cambios };
+}
+
 function accionRespuesta(db, config, p, hoy, correo) {
   var fila = { Respuesta: p.respuesta, 'Fecha respuesta': hoy };
   if (p.respuesta === 'No renueva') fila.Estado = 'Excliente';
@@ -503,7 +550,8 @@ function armarEstado(db, config, hoy, correo, tipoCambio) {
       tolerancia: config.tolerancia, redondeo: config.redondeo, costo_credito: config.costo_credito,
       regalias: { 3: config.regalia_3, 6: config.regalia_6, 12: config.regalia_12 },
       telefono_jonathan: config.telefono_jonathan, telefono_fernando: config.telefono_fernando,
-      adobe_proximo: config.adobe_proximo, adobe_monto: config.adobe_monto, tipo_cambio_respaldo: config.tipo_cambio_respaldo
+      adobe_proximo: config.adobe_proximo, adobe_monto: config.adobe_monto, tipo_cambio_respaldo: config.tipo_cambio_respaldo,
+      dias_reaviso: config.dias_reaviso
     },
     tipoCambio: numero(tipoCambio) || numero(config.tipo_cambio_respaldo),
     clientes: lista,

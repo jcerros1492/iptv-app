@@ -1,7 +1,9 @@
 {
-  "version": "1.2",
+  "version": "1.4",
   "fecha": "2026-11-21",
   "cambios": [
-    "Ya no pide entrar con Google cada hora: la sesión dura 6 meses y se renueva sola"
+    "Registrar pago de deudas",
+    "Face ID mejorado",
+    "'Sin respuesta' quita la alerta por 3 días"
   ]
 }

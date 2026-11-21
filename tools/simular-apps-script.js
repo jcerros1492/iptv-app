@@ -76,5 +76,18 @@ r = post('estado',{}, malo); chk('sesión alterada rechazada', !r.ok);
 var hoyCR = ctx.hoy_(); sheets.Config.push(['cerrar_sesiones_antes', hoyCR, '']);
 r = post('estado',{}, tok); chk('cerrar_sesiones_antes saca a todos', !r.ok && /vencida/.test(r.error));
 sheets.Config.pop();
+// Pago de deuda
+var e0 = post('estado',{}).datos; var debeF = e0.clientes.find(c=>c.usuario==='fval85').debe, sobre0 = e0.resumen.sobre;
+r = post('pagarDeuda',{usuario:'fval85', monto: debeF, forma:'SINPE', enSobre:true});
+var e1 = post('estado',{}).datos;
+chk('deuda pagada completa', r.ok && e1.clientes.find(c=>c.usuario==='fval85').debe===0 && Math.abs(e1.resumen.sobre - sobre0 - debeF) < 0.01 && !e1.alertas.some(a=>a.usuario==='fval85'));
+var debeJ = e1.clientes.find(c=>c.usuario==='JCerros14').debe;
+r = post('pagarDeuda',{usuario:'JCerros14', monto: 10000, forma:'Efectivo', enSobre:true});
+var e2 = post('estado',{}).datos;
+chk('abono deja saldo', r.ok && Math.abs(e2.clientes.find(c=>c.usuario==='JCerros14').debe - (debeJ-10000)) < 0.01 && Math.abs(r.datos.queda - (debeJ-10000))<0.01);
+chk('pago de deuda devuelve estado nuevo', !!r.estado);
+// Sin respuesta calla la alerta
+r = post('respuesta',{usuario:'AlexisSegura',respuesta:'Sin respuesta'});
+chk('Sin respuesta quita la alerta', r.ok && !r.estado.alertas.some(a=>a.usuario==='AlexisSegura'));
 console.log(fallas? fallas+' con error':'Todo bien');
 process.exit(fallas?1:0);

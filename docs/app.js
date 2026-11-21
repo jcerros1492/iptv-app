@@ -92,7 +92,7 @@
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
             }
-            var fn = { guardarCobro: accionGuardarCobro, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
+            var fn = { guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
             if (!fn) throw new Error('Acción desconocida');
             r = fn(db, config, datos, hoy, correo, tc);
             aplicarCambiosEnMemoria(db, r.cambios); guardarDemo();
@@ -210,19 +210,29 @@
     return window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable ?
       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable() : Promise.resolve(false);
   }
-  function activarBloqueo(pin) {
-    return hashPin(pin).then(function (h) {
-      return biometriaDisponible().then(function (si) {
-        if (!si) return { pin: h, cred: null };
-        return navigator.credentials.create({ publicKey: {
-          challenge: aleatorio(32), rp: { name: 'App IPTV' },
-          user: { id: aleatorio(16), name: S.sesion.correo, displayName: S.sesion.nombre || S.sesion.correo },
-          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
-          timeout: 60000
-        } }).then(function (c) { return { pin: h, cred: b64(c.rawId) }; }, function () { return { pin: h, cred: null }; });
-      });
+  /* En iPhone, Face ID solo se puede pedir directo al tocar un botón: por eso se pide PRIMERO,
+     sin esperar nada antes, y el PIN se pide después. */
+  function crearCredencial() {
+    return navigator.credentials.create({ publicKey: {
+      challenge: aleatorio(32), rp: { name: 'App IPTV' },
+      user: { id: aleatorio(16), name: S.sesion.correo, displayName: S.sesion.nombre || S.sesion.correo },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+      timeout: 60000
+    } }).then(function (c) { return b64(c.rawId); });
+  }
+  function activarBloqueo() {
+    var bio = S.bioDisponible ? crearCredencial().then(null, function (e) { toast(nombreBiometria() + ' no se activó (' + (e && e.name || 'error') + '). Queda solo el PIN.'); return null; }) : Promise.resolve(null);
+    return bio.then(function (cred) {
+      var p = window.prompt('Escoja un PIN de 4 a 6 números (respaldo por si falla ' + nombreBiometria() + '):');
+      if (!p || !/^\d{4,6}$/.test(p)) { if (p) toast('El PIN debe tener de 4 a 6 números'); throw new Error('cancelado'); }
+      return hashPin(p).then(function (h) { return { pin: h, cred: cred }; });
     }).then(function (b) { localStorage.setItem('iptv_bloqueo', JSON.stringify(b)); return b; });
+  }
+  function agregarBiometria() {
+    return crearCredencial().then(function (cred) {
+      var b = bloqueo(); b.cred = cred; localStorage.setItem('iptv_bloqueo', JSON.stringify(b)); return b;
+    });
   }
   function verificarBiometria() {
     var b = bloqueo();
@@ -238,14 +248,22 @@
     var b = bloqueo();
     $app.innerHTML = '<div class="entrar oscuro"><div class="logo">TV</div><h1>Hola, ' + esc(S.sesion.nombre || '') + '</h1>' +
       '<p>' + (b.cred ? 'Use ' + nombreBiometria() + ' para entrar' : 'Escriba su PIN para entrar') + '</p>' +
-      (b.cred ? '<button class="faceid" id="bio" aria-label="Entrar con ' + nombreBiometria() + '">' + ico('face', '') + '</button>' : '') +
+      (b.cred ? '<button class="faceid" id="bio" aria-label="Entrar con ' + nombreBiometria() + '">' + ico('face', '') + '</button>' +
+        '<button class="btn" id="bio2" style="max-width:260px;margin-top:14px">Entrar con ' + nombreBiometria() + '</button>' +
+        '<button class="enlace" id="usar-pin" style="margin-top:18px;background:none;border:0;color:inherit;opacity:.7;text-decoration:underline;font-size:15px">Usar PIN</button>' : '') +
+      '<div id="zona-pin"' + (b.cred ? ' hidden' : '') + ' style="width:100%;display:' + (b.cred ? 'none' : 'flex') + ';flex-direction:column;align-items:center">' +
       '<label class="oculto" for="pin">PIN</label><input id="pin" class="pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" style="margin-top:' + (b.cred ? '20px' : '40px') + '">' +
-      '<button class="btn sec" id="pin-ok" style="max-width:220px">Entrar con PIN</button></div>';
+      '<button class="btn sec" id="pin-ok" style="max-width:220px">Entrar con PIN</button></div></div>';
     function listo() { S.desbloqueado = true; marcarActividad(); render(); }
     if (b.cred) {
-      var bio = function () { verificarBiometria().then(listo, function () { toast('No se pudo verificar. Use su PIN.'); }); };
+      var bio = function () { verificarBiometria().then(listo, function () { toast('No se pudo verificar. Intente otra vez o use su PIN.'); }); };
       document.getElementById('bio').onclick = bio;
-      bio();
+      document.getElementById('bio2').onclick = bio;
+      document.getElementById('usar-pin').onclick = function () {
+        var z = document.getElementById('zona-pin'); z.hidden = false; z.style.display = 'flex'; document.getElementById('pin').focus();
+      };
+      // Intento automático (Android y algunos iPhone lo permiten); si no, queda el botón.
+      verificarBiometria().then(listo, function () { });
     }
     document.getElementById('pin-ok').onclick = function () {
       hashPin(document.getElementById('pin').value).then(function (h) {
@@ -345,7 +363,7 @@
     var a = S.datos.alertas;
     return barra('Alertas', '#/inicio') + '<p class="nota" style="margin:0 0 10px">Cosas que revisar en el negocio</p>' +
       (a.length ? '<div class="card">' + a.map(function (x) {
-        var href = x.usuario ? ((x.tipo === 'Vencido' || x.tipo === 'Por vencer') ? '#/mensaje/' : '#/cliente/') + encodeURIComponent(x.usuario) :
+        var href = x.usuario ? ((x.tipo === 'Vencido' || x.tipo === 'Por vencer') ? '#/mensaje/' : x.tipo === 'Cobro' ? '#/deuda/' : '#/cliente/') + encodeURIComponent(x.usuario) :
           (x.tipo === 'Gasto fijo' || x.tipo === 'Créditos' || x.tipo === 'Depósito') ? '#/finanzas' : '#/inicio';
         return '<a class="fila" href="' + href + '"><span class="punto ' + x.nivel + '"></span><span class="txt"><span class="t2" style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;font-size:11px">' +
           esc(x.tipo) + '</span><span class="t1">' + esc(x.titulo) + '</span><span class="t2">' + esc(x.detalle) + '</span></span></a>';
@@ -391,7 +409,8 @@
     return barra('Ficha del cliente', '#/clientes') +
       '<div class="ficha-nombre">' + esc(c.usuario) + '</div><div class="chips">' + chipE + (c.idPanel ? '<span class="chip">ID ' + esc(c.idPanel) + '</span>' : '') +
       (c.nombre ? '<span class="chip">' + esc(c.nombre) + '</span>' : '') + '</div>' +
-      (c.debe > 0 ? '<div class="aviso rojo" style="margin-top:14px">' + ico('alerta') + '<div><b>Debe ' + colones(c.debe) + '</b>Cobros pendientes registrados en la app.</div></div>' : '') +
+      (c.debe > 0 ? '<div class="aviso rojo" style="margin-top:14px">' + ico('alerta') + '<div style="flex:1"><b>Debe ' + colones(c.debe) + '</b>Cobros pendientes registrados en la app.</div>' +
+        '<a class="btn chico" style="align-self:center;white-space:nowrap" href="#/deuda/' + encodeURIComponent(u) + '">Registrar pago</a></div>' : '') +
       '<div class="card" style="margin-top:14px">' +
       '<div class="dato"><span class="l">Dispositivos</span><span class="v">' + c.dispositivos + '</span></div>' +
       '<div class="dato"><span class="l">Precio por mes hoy</span><span class="v">' + colones(precio) + '</span></div>' +
@@ -426,7 +445,7 @@
       '<div class="card pad" style="margin-top:16px"><b style="font-size:14px">¿Qué respondió?</b>' +
       '<div class="opciones c3" style="margin-top:10px"><a class="op" style="text-decoration:none;background:var(--verde-bg);color:var(--verde-txt)" href="#/cobro/' + encodeURIComponent(u) + '">Renueva</a>' +
       '<button class="op" data-resp="No renueva">No renueva</button><button class="op" data-resp="Sin respuesta">Sin respuesta</button></div>' +
-      '<p class="nota" style="margin:10px 0 0">Renueva: abre el cobro. Sin respuesta: se le vuelve a avisar. No renueva: pasa a exclientes.</p></div>';
+      '<p class="nota" style="margin:10px 0 0">Renueva: abre el cobro. Sin respuesta: la alerta se quita y vuelve en ' + (numero(S.datos.config.dias_reaviso) || 3) + ' días si no ha pagado. No renueva: pasa a exclientes.</p></div>';
   }
 
   /* --- Registrar cobro --- */
@@ -597,6 +616,26 @@
       }).join('') + '</div>';
   }
 
+  /* --- Pago de deuda --- */
+  function pDeuda(u) {
+    var c = cliente(u); if (!c) return barra('Pago de deuda', '#/inicio') + '<div class="vacio">No se encontró ' + esc(u) + '</div>';
+    if (!S.deuda || S.deuda.usuario !== u) S.deuda = { usuario: u, forma: 'SINPE', enSobre: true };
+    var d = S.deuda;
+    var pend = S.datos.cobros.filter(function (x) { return x.Usuario === u && x.Estado === 'Pendiente'; });
+    return barra('Pago de deuda', '#/cliente/' + encodeURIComponent(u)) +
+      '<div class="ficha-nombre">' + esc(u) + '</div>' +
+      (c.debe > 0 ?
+        '<div class="card" style="margin-top:14px">' + pend.map(function (x) {
+          return '<div class="dato"><span class="l">' + fechaCorta(x.Fecha) + (x.Nota ? '<br><small>' + esc(x.Nota) + '</small>' : '') + '</span><span class="v">' + colones(numero(x.Monto)) + '</span></div>';
+        }).join('') + '<div class="dato"><span class="l"><b>Total que debe</b></span><span class="v"><b>' + colones(c.debe) + '</b></span></div></div>' +
+        '<div class="etq">¿Cuánto pagó?</div><input id="deuda-monto" class="input" type="text" inputmode="decimal" value="' + numero(c.debe) + '">' +
+        '<div class="etq">Forma de pago</div><div class="opciones c2"><button class="op' + (d.forma === 'SINPE' ? ' sel' : '') + '" data-dforma="SINPE">SINPE</button><button class="op' + (d.forma === 'Efectivo' ? ' sel' : '') + '" data-dforma="Efectivo">Efectivo</button></div>' +
+        '<label class="check"><input type="checkbox" id="deuda-sobre"' + (d.enSobre ? ' checked' : '') + '>Ya está en el sobre BCR</label>' +
+        '<p class="nota">Si paga menos, queda debiendo la diferencia.</p>' +
+        '<button class="btn" id="deuda-ok" style="margin-top:6px">Guardar pago</button>'
+        : '<div class="card" style="margin-top:14px"><div class="vacio">' + esc(u) + ' no debe nada.</div></div>');
+  }
+
   /* --- Ajustes --- */
   function pAjustes() {
     var b = bloqueo(), c = S.datos.config;
@@ -609,7 +648,8 @@
       '<p class="nota">Los precios y montos se cambian en la pestaña Config de la hoja de Google.</p>' +
       '<div class="etq">Este celular</div><div class="card">' +
       '<div class="dato"><span class="l">Sesión</span><span class="v">' + esc(S.sesion.nombre || '') + '<br><small style="font-weight:400;color:var(--suave)">' + esc(S.sesion.correo) + '</small></span></div>' +
-      '<div class="dato"><span class="l">Bloqueo con ' + nombreBiometria() + ' / PIN</span><span class="v">' + (b ? '<button class="btn chico rojo" id="bloq-off">Quitar</button>' : '<button class="btn chico" id="bloq-on">Activar</button>') + '</span></div>' +
+      '<div class="dato"><span class="l">Bloqueo con ' + nombreBiometria() + ' / PIN' + (b ? '<br><small>' + (b.cred ? nombreBiometria() + ' y PIN activos' : 'Solo PIN') + '</small>' : '') + '</span><span class="v">' + (b ? '<button class="btn chico rojo" id="bloq-off">Quitar</button>' : '<button class="btn chico" id="bloq-on">Activar</button>') + '</span></div>' +
+      (b && !b.cred && S.bioDisponible ? '<div class="dato"><span class="l">' + nombreBiometria() + '</span><span class="v"><button class="btn chico" id="bio-on">Activar ' + nombreBiometria() + '</button></span></div>' : '') +
       '<div class="dato"><span class="l">Notificaciones</span><span class="v"><button class="btn chico sec" id="notif">Activar en este celular</button></span></div></div>' +
       '<button class="btn sec" id="salir" style="margin-top:16px">Cerrar sesión</button>' +
       (DEMO ? '<button class="btn rojo" id="reiniciar" style="margin-top:10px">Reiniciar datos de demostración</button>' : '') +
@@ -622,7 +662,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -724,7 +764,7 @@
       todos('[data-resp]', function (b) {
         b.onclick = function () {
           guardando(b, api('respuesta', { usuario: arg, respuesta: b.dataset.resp })).then(refrescar).then(function () {
-            toast(b.dataset.resp === 'No renueva' ? arg + ' pasó a exclientes' : 'Se le volverá a avisar');
+            toast(b.dataset.resp === 'No renueva' ? arg + ' pasó a exclientes' : 'Listo. Se le vuelve a avisar en ' + (numero(S.datos.config.dias_reaviso) || 3) + ' días');
             ir('#/inicio');
           });
         };
@@ -794,13 +834,30 @@
         api('guardarControl', { sobreReal: numero(s), creditosPanel: numero(c) }).then(refrescar).then(function () { toast('Control guardado'); render(); }, function (e) { toast(e.message); });
       };
     }
+    if (ruta === 'deuda' && $('deuda-ok')) {
+      todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = $('deuda-monto').value; render(); }; });
+      if (S.deuda.monto) $('deuda-monto').value = S.deuda.monto;
+      $('deuda-sobre').onchange = function () { S.deuda.enSobre = this.checked; };
+      $('deuda-ok').onclick = function () {
+        var m = numero($('deuda-monto').value);
+        if (!(m > 0)) { toast('Escriba el monto que pagó'); return; }
+        guardando(this, api('pagarDeuda', { usuario: arg, monto: m, forma: S.deuda.forma, enSobre: S.deuda.enSobre })).then(function (r) {
+          return refrescar().then(function () {
+            S.deuda = null;
+            toast(r.queda > 0 ? 'Abono guardado. Queda debiendo ' + colones(r.queda) : 'Deuda pagada ✓');
+            ir('#/cliente/' + encodeURIComponent(arg));
+          });
+        });
+      };
+    }
     if (ruta === 'ajustes') {
       $('tc2').onclick = function () { S.cobro = null; editarTipoCambio(true); };
       if ($('bloq-on')) $('bloq-on').onclick = function () {
-        var p = window.prompt('Escoja un PIN de 4 a 6 números (respaldo por si falla ' + nombreBiometria() + '):');
-        if (!p || !/^\d{4,6}$/.test(p)) { if (p) toast('El PIN debe tener de 4 a 6 números'); return; }
-        activarBloqueo(p).then(function (b) { toast(b.cred ? nombreBiometria() + ' activado' : 'PIN activado (este equipo no tiene ' + nombreBiometria() + ')'); render(); },
-          function () { toast('No se pudo activar'); });
+        activarBloqueo().then(function (b) { toast(b.cred ? nombreBiometria() + ' y PIN activados' : 'PIN activado'); render(); }, function () { });
+      };
+      if ($('bio-on')) $('bio-on').onclick = function () {
+        agregarBiometria().then(function () { toast(nombreBiometria() + ' activado'); render(); },
+          function (e) { toast(nombreBiometria() + ' no se activó (' + (e && e.name || 'error') + ')'); });
       };
       if ($('bloq-off')) $('bloq-off').onclick = function () {
         confirmarIdentidad().then(function () { localStorage.removeItem('iptv_bloqueo'); toast('Bloqueo quitado'); render(); }, function () { });
@@ -856,6 +913,7 @@
   if ('serviceWorker' in navigator && location.protocol === 'https:' && !(CFG.ONESIGNAL_APP_ID && !DEMO)) {
     navigator.serviceWorker.register('sw.js').catch(function () { });
   }
+  biometriaDisponible().then(function (v) { S.bioDisponible = !!v; }, function () { });
   S.sesion = leerSesion();
   if (S.sesion && bloqueo()) S.desbloqueado = false; else if (S.sesion) S.desbloqueado = true;
   iniciarNotificaciones();

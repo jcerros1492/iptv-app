@@ -4,6 +4,13 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 1.6 · 21 nov 2026
+- iPhone: al volver a la app, el botón de Face ID a veces no hacía nada (quedaba una solicitud
+  colgada). Ahora se cancela la anterior y Face ID se pide solo al tocar el botón.
+- Si Face ID falla, aparece un mensaje visible (antes era oscuro sobre fondo oscuro).
+- Botón "Entrar con Face ID" más visible (blanco). La pantalla ya no se agranda con dos toques.
+- Motor: no.
+
 ## 1.5 · 21 nov 2026
 - Inicio muestra "Actualizado a las 2:34 p. m." debajo del título. Mientras trae datos dice
   "Actualizando…". Tocar ese texto actualiza en el momento.

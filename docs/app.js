@@ -251,12 +251,20 @@
   function verificarBiometria() {
     var b = bloqueo();
     if (!b || !b.cred) return Promise.reject(new Error('sin biometría'));
-    return navigator.credentials.get({ publicKey: {
+    // Si quedó una solicitud anterior colgada (por ejemplo al volver a la app), se cancela primero.
+    if (S.bioPendiente) { try { S.bioPendiente.abort(); } catch (e) { } }
+    var ctl = window.AbortController ? new AbortController() : null;
+    S.bioPendiente = ctl;
+    var op = { publicKey: {
       challenge: aleatorio(32), allowCredentials: [{ type: 'public-key', id: deB64(b.cred) }],
       userVerification: 'required', timeout: 60000
-    } });
+    } };
+    if (ctl) op.signal = ctl.signal;
+    return navigator.credentials.get(op).then(function (r) { if (S.bioPendiente === ctl) S.bioPendiente = null; return r; },
+      function (e) { if (S.bioPendiente === ctl) S.bioPendiente = null; throw e; });
   }
-  function nombreBiometria() { return /iPhone|iPad|Mac/.test(navigator.userAgent) ? 'Face ID' : 'huella'; }
+  var ES_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function nombreBiometria() { return ES_IOS || /Mac/.test(navigator.userAgent) ? 'Face ID' : 'huella'; }
   function pantallaBloqueo() {
     $nav.hidden = true;
     var b = bloqueo();
@@ -270,14 +278,20 @@
       '<button class="btn sec" id="pin-ok" style="max-width:220px">Entrar con PIN</button></div></div>';
     function listo() { S.desbloqueado = true; marcarActividad(); render(); }
     if (b.cred) {
-      var bio = function () { verificarBiometria().then(listo, function () { toast('No se pudo verificar. Intente otra vez o use su PIN.'); }); };
+      var bio = function () {
+        verificarBiometria().then(listo, function (e) {
+          if (e && e.name === 'AbortError') return;
+          toast(nombreBiometria() + ' no funcionó' + (e && e.name ? ' (' + e.name + ')' : '') + '. Toque otra vez o use su PIN.');
+        });
+      };
       document.getElementById('bio').onclick = bio;
       document.getElementById('bio2').onclick = bio;
       document.getElementById('usar-pin').onclick = function () {
         var z = document.getElementById('zona-pin'); z.hidden = false; z.style.display = 'flex'; document.getElementById('pin').focus();
       };
-      // Intento automático (Android y algunos iPhone lo permiten); si no, queda el botón.
-      verificarBiometria().then(listo, function () { });
+      // En Android se intenta solo al abrir. En iPhone no: Apple lo bloquea sin tocar un botón
+      // y deja la solicitud colgada, y entonces el botón no responde.
+      if (!ES_IOS) verificarBiometria().then(listo, function () { });
     }
     document.getElementById('pin-ok').onclick = function () {
       hashPin(document.getElementById('pin').value).then(function (h) {

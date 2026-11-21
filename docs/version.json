@@ -1,7 +1,7 @@
 {
-  "version": "1.5",
+  "version": "1.6",
   "fecha": "2026-11-21",
   "cambios": [
-    "Inicio muestra la hora de la última actualización (tóquela para actualizar)"
+    "Face ID responde siempre al tocar el botón en iPhone"
   ]
 }

@@ -425,7 +425,7 @@
     };
     var lista = buscarClientes(S.busqueda ? todos : grupos[S.filtro], S.busqueda);
     lista = S.filtro === 'Exclientes' && !S.busqueda ? lista.slice().sort(function (a, b) { return a.ultimoPago < b.ultimoPago ? 1 : -1; }) : ordenarPorVencimiento(lista);
-    return banner() + '<div class="top"><h1>Clientes</h1><a class="btn chico" href="#/nuevo">+ Nuevo</a></div>' +
+    return banner() + '<div class="top"><h1>Clientes</h1><div style="display:flex;gap:8px"><a class="btn chico sec" href="#/promo">Promo</a><a class="btn chico" href="#/nuevo">+ Nuevo</a></div></div>' +
       '<label class="oculto" for="q">Buscar por nombre, usuario o teléfono</label><div class="buscar">' + ico('buscar') +
       '<input id="q" type="search" autocomplete="off" placeholder="Buscar por nombre, usuario o teléfono" value="' + esc(S.busqueda) + '"></div>' +
       '<div class="filtros">' + Object.keys(grupos).map(function (k) {
@@ -607,14 +607,124 @@
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; a.click();
       if (!soloGuardar && k.telefono) {
         toast('Imagen guardada. Adjúntela en el chat que se abre.');
-        setTimeout(function () { window.open('https://wa.me/' + telefonoWhatsApp(k.telefono), '_blank'); }, 600);
+        setTimeout(function () { abrirWhatsApp(k.telefono); }, 600);
       } else toast('Imagen guardada');
     });
   }
 
+  /** Abre WhatsApp. En iPhone se abre la app directo (sin dejar una pestaña en blanco al volver). */
+  function abrirWhatsApp(tel, texto) {
+    var num = telefonoWhatsApp(tel), t = texto ? encodeURIComponent(texto) : '';
+    if (ES_IOS) { location.href = 'whatsapp://send?phone=' + num + (t ? '&text=' + t : ''); return; }
+    window.open('https://wa.me/' + num + (t ? '?text=' + t : ''), '_blank');
+  }
+  /* --- Promoción para clientes nuevos --- */
+  var PROMO = { canales: '7.467', series: '1.521', peliculas: '12.132' };
+  function preciosHoy() {
+    var cfg = configLogica(), tc = S.datos.tipoCambio;
+    return [1, 2, 3, 5].map(function (n) {
+      return { d: n, p: calcularCobro(cfg, { dispositivos: n, meses: 1, tipoCambio: tc, hoy: S.datos.hoy, venceActual: '' }).esperado };
+    });
+  }
+  function pPromo() {
+    var pr = preciosHoy(), c = S.datos.config;
+    return barra('Compartir promoción', '#/clientes') +
+      '<p class="nota" style="margin:0 0 12px">La imagen se arma sola con los precios de hoy.</p>' +
+      '<div id="promo-vista" style="border-radius:18px;overflow:hidden;background:#0E1330;min-height:200px;display:flex;align-items:center;justify-content:center;color:#C9CEEA">Preparando imagen…</div>' +
+      '<div class="card" style="margin-top:14px">' +
+      '<div class="dato"><span class="l">Precios calculados con el tipo de cambio de hoy</span><span class="v">' + colones(S.datos.tipoCambio) + '</span></div></div>' +
+      '<div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">' +
+      '<button class="btn verde" id="promo-compartir" disabled>' + ico('wa', '') + 'Enviar por WhatsApp u otra app</button>' +
+      '<button class="btn sec" id="promo-guardar" disabled>Guardar imagen</button></div>' +
+      '<p class="nota" style="text-align:center">Sirve para un chat, estados de WhatsApp o Facebook.</p>';
+  }
+  function dibujarPromo() {
+    var pr = preciosHoy(), c = S.datos.config, rg = c.regalias || { 3: 1, 6: 2, 12: 3 };
+    var W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var x = cv.getContext('2d');
+    var F = '-apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif';
+    var NAR = '#FF7A4D', AZ = '#0E1330', CARD = '#1A2250', TXT2 = '#C9CEEA';
+    x.fillStyle = AZ; x.fillRect(0, 0, W, H);
+    // Etiqueta y "Activación inmediata"
+    x.strokeStyle = NAR; x.lineWidth = 3; redondo(x, 72, 72, 472, 54, 27); x.stroke();
+    x.fillStyle = NAR; x.font = '700 24px ' + F; x.fillText('IPTV · TELEVISIÓN POR INTERNET', 96, 108);
+    x.fillStyle = '#fff'; redondo(x, 704, 74, 304, 50, 25); x.fill();
+    x.fillStyle = AZ; x.font = '700 24px ' + F; x.textAlign = 'center'; x.fillText('⚡ Activación inmediata', 856, 108); x.textAlign = 'left';
+    // Título
+    x.fillStyle = '#fff'; x.font = '800 80px ' + F;
+    x.fillText('Toda su TV, en todas sus', 72, 220, W - 144); x.fillText('pantallas.', 72, 302);
+    // Cifras
+    x.fillStyle = '#2A3366'; x.fillRect(72, 337, W - 144, 2); x.fillRect(72, 485, W - 144, 2);
+    [[PROMO.canales, 'canales'], [PROMO.series, 'series'], [PROMO.peliculas, 'películas']].forEach(function (k, i) {
+      var cx = 220 + i * 320; x.textAlign = 'center';
+      x.fillStyle = NAR; x.font = '800 62px ' + F; x.fillText('+' + k[0], cx, 413);
+      x.fillStyle = TXT2; x.font = '400 28px ' + F; x.fillText(k[1], cx, 455);
+    });
+    x.textAlign = 'left';
+    // Precios
+    x.fillStyle = TXT2; x.font = '700 26px ' + F; x.fillText('PRECIO POR MES', 72, 535);
+    pr.forEach(function (p, i) {
+      var bx = 72 + i * 238, bw = 222;
+      x.fillStyle = CARD; redondo(x, bx, 560, bw, 176, 18); x.fill();
+      x.fillStyle = '#fff'; x.font = '700 38px ' + F; x.fillText(String(p.d), bx + 22, 615);
+      x.fillStyle = TXT2; x.font = '400 24px ' + F; x.fillText(p.d === 1 ? 'dispositivo' : 'dispositivos', bx + 22, 655);
+      x.fillStyle = '#fff'; x.font = '800 40px ' + F; x.fillText(colones(p.p), bx + 20, 708);
+    });
+    // Regalías
+    x.fillStyle = NAR; redondo(x, 72, 762, W - 144, 174, 24); x.fill();
+    x.fillStyle = AZ; x.font = '800 36px ' + F; x.fillText('Pague por adelantado y reciba meses gratis', 104, 822);
+    [[3, rg[3]], [6, rg[6]], [12, rg[12]]].forEach(function (m, i) {
+      var bx = 104 + i * 296, bw = 280;
+      x.fillStyle = AZ; redondo(x, bx, 850, bw, 58, 14); x.fill();
+      x.textAlign = 'center'; x.font = '700 26px ' + F;
+      var a = m[0] + ' meses ', b = '+' + m[1] + ' gratis', wa = x.measureText(a).width, wb = x.measureText(b).width, sx = bx + bw / 2 - (wa + wb) / 2;
+      x.textAlign = 'left'; x.fillStyle = '#fff'; x.fillText(a, sx, 888); x.fillStyle = NAR; x.fillText(b, sx + wa, 888);
+    });
+    // Dispositivos e internet
+    x.strokeStyle = '#2A3366'; x.lineWidth = 2; redondo(x, 72, 962, 528, 156, 20); x.stroke(); redondo(x, 618, 962, 390, 156, 20); x.stroke();
+    x.fillStyle = TXT2; x.font = '700 22px ' + F; x.fillText('VÉALO EN', 96, 1001); x.fillText('INTERNET RECOMENDADO', 640, 1001);
+    x.strokeStyle = '#fff'; x.lineWidth = 3; x.fillStyle = '#fff'; x.font = '600 20px ' + F; x.textAlign = 'center';
+    var iconos = [
+      function (cx, cy) { redondo(x, cx - 12, cy - 20, 24, 40, 5); x.stroke(); x.fillRect(cx - 3, cy + 13, 6, 2); },
+      function (cx, cy) { redondo(x, cx - 17, cy - 21, 34, 42, 5); x.stroke(); x.fillRect(cx - 3, cy + 14, 6, 2); },
+      function (cx, cy) { redondo(x, cx - 22, cy - 18, 44, 30, 4); x.stroke(); x.fillRect(cx - 10, cy + 18, 20, 3); },
+      function (cx, cy) { redondo(x, cx - 18, cy - 17, 36, 25, 3); x.stroke(); x.fillRect(cx - 25, cy + 12, 50, 3); }
+    ];
+    ['Celular', 'Tablet', 'Apple TV', 'Computadora'].forEach(function (t, i) {
+      var cx = 152 + i * 124; iconos[i](cx, 1042); x.fillText(t, cx, 1095);
+    });
+    x.textAlign = 'left'; x.font = '600 24px ' + F; x.fillText('Canales HD', 640, 1045); x.fillText('Películas 4K', 640, 1092);
+    x.fillStyle = NAR; x.font = '700 30px ' + F; x.textAlign = 'right'; x.fillText('10 Mbps', 984, 1047); x.fillText('100 Mbps', 984, 1094); x.textAlign = 'left';
+    // Contacto
+    x.fillStyle = TXT2; x.font = '700 24px ' + F; x.fillText('ESCRÍBANOS POR WHATSAPP', 72, 1172);
+    x.textAlign = 'right'; x.font = '400 22px ' + F; x.fillText('Pago por SINPE Móvil', 1008, 1172); x.textAlign = 'left';
+    [['Jonathan', c.telefono_jonathan], ['Fernando', c.telefono_fernando]].forEach(function (p, i) {
+      var bx = 72 + i * 476;
+      x.fillStyle = CARD; redondo(x, bx, 1192, 460, 94, 18); x.fill();
+      x.fillStyle = TXT2; x.font = '400 22px ' + F; x.fillText(p[0], bx + 40, 1228);
+      x.fillStyle = '#fff'; x.font = '800 32px ' + F; x.fillText(p[1] || '', bx + 40, 1268);
+    });
+    return new Promise(function (ok) { cv.toBlob(function (b) { ok({ blob: b, url: cv.toDataURL('image/png') }); }, 'image/png'); });
+  }
+  /** Compartir una imagen ya preparada (en iPhone tiene que ser en el mismo toque). */
+  function compartirArchivo(file, titulo, soloGuardar, telefono) {
+    // En iPhone, "Guardar imagen" también está en el menú de compartir
+    if ((!soloGuardar || ES_IOS) && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: titulo }).catch(function () { });
+      return;
+    }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+    if (!soloGuardar && telefono) {
+      toast('Imagen guardada. Adjúntela en el chat que se abre.');
+      setTimeout(function () { abrirWhatsApp(telefono); }, 600);
+    } else toast(/iPhone|iPad/.test(navigator.userAgent) ? 'Mantenga presionada la imagen para guardarla' : 'Imagen guardada');
+  }
+
   /* --- Nuevo cliente --- */
   function pNuevo() {
-    return barra('Nuevo cliente', '#/clientes', 'cerrar') + '<div class="form">' +
+    return barra('Nuevo cliente', '#/clientes', 'cerrar') +
+      '<a class="aviso" href="#/promo" style="text-decoration:none;color:inherit;margin-bottom:14px">' + ico('wa') + '<div><b>¿Todavía no se decide?</b>Envíele la imagen con los precios de hoy</div></a>' +
+      '<div class="form">' +
       '<label class="campo">Usuario (igual que en XtreamAI)<input class="input" id="n-usuario" autocomplete="off" autocapitalize="off"></label>' +
       '<div class="dos"><label class="campo">WhatsApp<input class="input" id="n-tel" inputmode="tel" placeholder="8888-8888"></label>' +
       '<label class="campo">ID del panel<input class="input" id="n-id" inputmode="numeric" placeholder="Opcional"></label></div>' +
@@ -716,7 +826,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -784,7 +894,7 @@
           var p1 = calcularCobro(cfg, { dispositivos: c.dispositivos, meses: 1, tipoCambio: S.datos.tipoCambio, hoy: S.datos.hoy }).esperado;
           var txt = 'Hola, ¡le saludamos de su servicio de TV por Internet! Tenemos más canales, series y películas. ' +
             'El mes con ' + disp(c.dispositivos) + ' es ' + colones(p1) + ', y si paga 3 meses le regalamos 1. ¿Le gustaría volver? La activación es inmediata.';
-          window.open('https://wa.me/' + telefonoWhatsApp(c.telefono) + '?text=' + encodeURIComponent(txt), '_blank');
+          abrirWhatsApp(c.telefono, txt);
         };
       });
     }
@@ -813,7 +923,7 @@
       };
       if ($('pw-enviar')) $('pw-enviar').onclick = function () {
         traerPw().then(function (v) {
-          window.open('https://wa.me/' + telefonoWhatsApp(cliente(u).telefono) + '?text=' + encodeURIComponent(mensajeAcceso(u, v)), '_blank');
+          abrirWhatsApp(cliente(u).telefono, mensajeAcceso(u, v));
         }, error);
       };
       if ($('usr-copiar')) $('usr-copiar').onclick = function () {
@@ -832,7 +942,7 @@
     if (ruta === 'mensaje') {
       var cm = cliente(arg);
       if ($('enviar-wa')) $('enviar-wa').onclick = function () {
-        window.open('https://wa.me/' + telefonoWhatsApp(cm.telefono) + '?text=' + encodeURIComponent($('msg').value), '_blank');
+        abrirWhatsApp(cm.telefono, $('msg').value);
       };
       todos('[data-resp]', function (b) {
         b.onclick = function () {
@@ -879,8 +989,24 @@
       };
     }
     if (ruta === 'comprobante') {
-      $('comp-wa').onclick = function () { enviarComprobante(false); };
-      $('comp-guardar').onclick = function () { enviarComprobante(true); };
+      // La imagen se prepara antes, para que al tocar se comparta en el mismo toque (iPhone lo exige)
+      var kc = S.comprobante, fileC = null;
+      dibujarComprobante(kc).then(function (blob) {
+        fileC = new File([blob], 'Comprobante-' + String(kc.numero).padStart(4, '0') + '-' + kc.usuario + '.png', { type: 'image/png' });
+      });
+      $('comp-wa').onclick = function () { if (fileC) compartirArchivo(fileC, 'Comprobante de pago', false, kc.telefono); else toast('Un momento…'); };
+      $('comp-guardar').onclick = function () { if (fileC) compartirArchivo(fileC, 'Comprobante de pago', true); else toast('Un momento…'); };
+    }
+    if (ruta === 'promo') {
+      var fileP = null;
+      dibujarPromo().then(function (r) {
+        fileP = new File([r.blob], 'Promo-IPTV.png', { type: 'image/png' });
+        var v = document.getElementById('promo-vista'); if (!v) return;
+        v.innerHTML = '<img src="' + r.url + '" alt="Imagen de la promoción" style="width:100%;display:block">';
+        $('promo-compartir').disabled = false; $('promo-guardar').disabled = false;
+      });
+      $('promo-compartir').onclick = function () { if (fileP) compartirArchivo(fileP, 'Promoción IPTV', false); };
+      $('promo-guardar').onclick = function () { if (fileP) compartirArchivo(fileP, 'Promoción IPTV', true); };
     }
     if (ruta === 'nuevo') {
       var nd = 1;

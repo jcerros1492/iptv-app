@@ -1,9 +1,7 @@
 {
-  "version": "1.7",
+  "version": "1.9",
   "fecha": "2026-11-21",
   "cambios": [
-    "Escoger qué meses paga una deuda",
-    "Copiar el usuario",
-    "Ver contraseñas más rápido"
+    "WhatsApp se abre directo, sin dejar una pestaña en blanco"
   ]
 }

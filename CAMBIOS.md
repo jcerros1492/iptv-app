@@ -4,6 +4,18 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 1.9 · 21 nov 2026
+- iPhone: los botones de WhatsApp abren la app de WhatsApp directo. Al volver ya no queda
+  una pestaña en blanco que haya que cerrar.
+- Incluye todo lo de la 1.8 (Promo).
+- Motor: no.
+
+## 1.8 · 21 nov 2026
+- Nuevo: Compartir promoción. En Clientes, botón "Promo" (y en Nuevo cliente). La imagen se arma
+  sola con los precios en colones del día y se envía por WhatsApp u otra app, o se guarda.
+- El comprobante se comparte mejor en iPhone (la imagen se prepara antes de tocar el botón).
+- Motor: no.
+
 ## 1.7 · 21 nov 2026
 - Pago de deuda: se marcan los meses que paga (ej. 2 de 3). El monto se suma solo; queda
   debiendo lo que no marcó.

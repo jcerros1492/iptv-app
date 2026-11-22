@@ -523,6 +523,16 @@ function accionRespuesta(db, config, p, hoy, correo) {
   ] };
 }
 
+/** Deshacer "No renueva": el cliente vuelve a Activo (si se pasó a excliente por error). */
+function accionReactivar(db, config, p, hoy, correo) {
+  var cli = db.clientes.filter(function (c) { return c.Usuario === p.usuario; })[0];
+  if (!cli) throw new Error('No existe el cliente ' + p.usuario);
+  return { resultado: { ok: true }, cambios: [
+    { tabla: 'Clientes', op: 'actualizar', clave: 'Usuario', valor: p.usuario, fila: { Estado: 'Activo', Respuesta: '', 'Fecha respuesta': '' } },
+    { tabla: 'Accesos', op: 'agregar', fila: { Fecha: hoy, Usuario: nombreSocio(config, correo), 'Acción': 'Reactivar', Detalle: p.usuario + ' volvió a Activo' } }
+  ] };
+}
+
 function accionGuardarControl(db, config, p, hoy, correo) {
   return { resultado: { ok: true }, cambios: [
     { tabla: 'Controles', op: 'agregar', fila: { Fecha: hoy, 'Sobre real': numero(p.sobreReal), 'Créditos panel': numero(p.creditosPanel), 'Registró': nombreSocio(config, correo) } }

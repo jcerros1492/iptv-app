@@ -92,7 +92,7 @@
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
             }
-            var fn = { guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
+            var fn = { guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
             if (!fn) throw new Error('Acción desconocida');
             r = fn(db, config, datos, hoy, correo, tc);
             aplicarCambiosEnMemoria(db, r.cambios); guardarDemo();
@@ -454,6 +454,8 @@
       (c.nombre ? '<span class="chip">' + esc(c.nombre) + '</span>' : '') + '</div>' +
       (c.debe > 0 ? '<div class="aviso rojo" style="margin-top:14px">' + ico('alerta') + '<div style="flex:1"><b>Debe ' + colones(c.debe) + '</b>Cobros pendientes registrados en la app.</div>' +
         '<a class="btn chico" style="align-self:center;white-space:nowrap" href="#/deuda/' + encodeURIComponent(u) + '">Registrar pago</a></div>' : '') +
+      (c.estado === 'Excliente' ? '<div class="aviso" style="margin-top:14px">' + ico('alerta') + '<div style="flex:1"><b>Está en exclientes</b>¿Fue un error? Puede volver a dejarlo activo.</div>' +
+        '<button class="btn chico" id="reactivar" style="align-self:center;white-space:nowrap">Reactivar</button></div>' : '') +
       '<div class="card" style="margin-top:14px">' +
       '<div class="dato"><span class="l">Dispositivos</span><span class="v">' + c.dispositivos + '</span></div>' +
       '<div class="dato"><span class="l">Precio por mes hoy</span><span class="v">' + colones(precio) + '</span></div>' +
@@ -926,6 +928,12 @@
           abrirWhatsApp(cliente(u).telefono, mensajeAcceso(u, v));
         }, error);
       };
+      if ($('reactivar')) $('reactivar').onclick = function () {
+        if (!window.confirm('¿Volver a dejar a ' + u + ' como cliente activo?')) return;
+        guardando(this, api('reactivar', { usuario: u })).then(function () {
+          return refrescar().then(function () { toast(u + ' está activo otra vez'); render(); });
+        });
+      };
       if ($('usr-copiar')) $('usr-copiar').onclick = function () {
         copiarTexto(u).then(function () { toast('Usuario copiado: ' + u); }, function () { toast('No se pudo copiar'); });
       };
@@ -946,6 +954,12 @@
       };
       todos('[data-resp]', function (b) {
         b.onclick = function () {
+          var preguntas = {
+            'No renueva': '¿Confirma que ' + arg + ' NO va a renovar?\n\nPasará a exclientes.',
+            'Sin respuesta': '¿Confirma que ' + arg + ' no ha respondido?\n\nLa alerta se quita y vuelve en ' + (numero(S.datos.config.dias_reaviso) || 3) + ' días.',
+            'Va a renovar': '¿Confirma que ' + arg + ' va a renovar?'
+          };
+          if (preguntas[b.dataset.resp] && !window.confirm(preguntas[b.dataset.resp])) return;
           guardando(b, api('respuesta', { usuario: arg, respuesta: b.dataset.resp })).then(refrescar).then(function () {
             toast(b.dataset.resp === 'No renueva' ? arg + ' pasó a exclientes' : 'Listo. Se le vuelve a avisar en ' + (numero(S.datos.config.dias_reaviso) || 3) + ' días');
             ir('#/inicio');

@@ -4,6 +4,12 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.0 · 21 nov 2026
+- Antes de guardar "No renueva", "Sin respuesta" o "Va a renovar" la app pregunta si está seguro.
+- Ficha de un excliente: botón "Reactivar" para devolverlo a activo (si se pasó por error).
+- Incluye todo lo de la 1.8 y 1.9.
+- Motor: SÍ → copiar Codigo.gs y Logica.gs a Apps Script y hacer Nueva versión.
+
 ## 1.9 · 21 nov 2026
 - iPhone: los botones de WhatsApp abren la app de WhatsApp directo. Al volver ya no queda
   una pestaña en blanco que haya que cerrar.

@@ -1,7 +1,8 @@
 {
-  "version": "1.9",
+  "version": "2.0",
   "fecha": "2026-11-21",
   "cambios": [
-    "WhatsApp se abre directo, sin dejar una pestaña en blanco"
+    "Confirmación antes de No renueva / Sin respuesta",
+    "Botón Reactivar para exclientes"
   ]
 }

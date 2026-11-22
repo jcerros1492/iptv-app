@@ -94,5 +94,6 @@ chk('pago de deuda devuelve estado nuevo', !!r.estado);
 // Sin respuesta calla la alerta
 r = post('respuesta',{usuario:'AlexisSegura',respuesta:'Sin respuesta'});
 chk('Sin respuesta quita la alerta', r.ok && !r.estado.alertas.some(a=>a.usuario==='AlexisSegura'));
+r = post('reactivar',{usuario:'YChaconV'}); chk('reactivar excliente', r.ok && r.estado.clientes.find(c=>c.usuario==='YChaconV').estado!=='Excliente');
 console.log(fallas? fallas+' con error':'Todo bien');
 process.exit(fallas?1:0);

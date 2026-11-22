@@ -153,6 +153,8 @@ function ejecutar_(accion, datos, correo) {
       return conCandado_(function (db, config) { return accionGuardarCliente(db, config, datos, hoy, correo); });
     case 'pagarDeuda':
       return conCandado_(function (db, config) { return accionPagarDeuda(db, config, datos, hoy, correo); });
+    case 'reactivar':
+      return conCandado_(function (db, config) { return accionReactivar(db, config, datos, hoy, correo); });
     case 'respuesta':
       return conCandado_(function (db, config) { return accionRespuesta(db, config, datos, hoy, correo); });
     case 'guardarControl':

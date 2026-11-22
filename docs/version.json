@@ -1,7 +1,8 @@
 {
-  "version": "2.4",
+  "version": "2.5",
   "fecha": "2026-11-22",
   "cambios": [
-    "Finanzas: créditos disponibles en grande"
+    "Reportes al instante al cambiar de periodo",
+    "Reporte como imagen para WhatsApp"
   ]
 }

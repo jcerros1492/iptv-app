@@ -4,6 +4,13 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.5 · 22 nov 2026
+- Reportes: los datos se bajan una sola vez (al entrar a Finanzas) y cada cambio de periodo o
+  pestaña es instantáneo.
+- Botón "Imagen": el reporte se envía como una imagen con el diseño azul/naranja (resumen +
+  lista de pagos, clientes o gastos según la pestaña), por WhatsApp u otra app.
+- Motor: SÍ → copiar Codigo.gs a Apps Script y hacer Nueva versión.
+
 ## 2.4 · 22 nov 2026
 - Finanzas: arriba en grande los créditos disponibles (con cuántos se usaron en 30 días y para
   cuántos meses alcanzan) y el dinero en el sobre. Aviso si quedan menos de 30 créditos.

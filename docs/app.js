@@ -92,6 +92,7 @@
               return ok({ usuario: datos.usuario, contrasena: c ? c['Contraseña'] : '' });
             }
             if (accion === 'reporte') return ok(reporte(db, config, datos.desde, datos.hasta));
+            if (accion === 'datosReporte') return ok({ cobros: db.cobros, movimientos: db.movimientos, clientes: db.clientes });
             if (accion === 'verContrasenas') {
               var m = {}; db.clientes.forEach(function (x) { if (x.Estado !== 'Excliente') m[x.Usuario] = x['Contraseña']; });
               return ok({ contrasenas: m });
@@ -119,7 +120,7 @@
       if (r.sesion && S.sesion) {   // el motor entrega (o renueva) la sesión larga
         S.sesion.token = r.sesion.token; S.sesion.exp = r.sesion.exp; guardarSesion(S.sesion);
       }
-      if (r.estado) { S.datos = r.estado; S.fresco = Date.now(); guardarCache(r.estado); marcarSync(); }
+      if (r.estado) { S.datos = r.estado; S.fresco = Date.now(); guardarCache(r.estado); marcarSync(); S.repBase = null; }
       return r.datos;
     });
   }
@@ -143,7 +144,7 @@
     // Si el servidor acaba de mandar los datos junto con lo guardado, no se piden otra vez
     if (S.fresco && Date.now() - S.fresco < 3000) { S.fresco = 0; return Promise.resolve(S.datos); }
     S.actualizando = true; pintarSync();
-    return api('estado').then(function (d) { S.datos = d; guardarCache(d); marcarSync(); S.actualizando = false; pintarSync(); return d; },
+    return api('estado').then(function (d) { S.datos = d; guardarCache(d); marcarSync(); S.repBase = null; S.actualizando = false; pintarSync(); return d; },
       function (e) { S.actualizando = false; pintarSync(); throw e; });
   }
 
@@ -814,13 +815,12 @@
   function pReportes() {
     if (!S.rep) S.rep = { tab: 'pagos', periodo: 'mes' };
     var R = S.rep, rg = rangoPeriodo(R.periodo), clave = rg.desde + '|' + rg.hasta;
-    if (!R.datos || R.clave !== clave) {
-      if (R.cargando !== clave) {
-        R.cargando = clave;
-        api('reporte', { desde: rg.desde, hasta: rg.hasta }).then(function (d) {
-          R.datos = d; R.clave = clave; R.cargando = null; if (/^#\/reportes/.test(location.hash)) render();
-        }, function (e) { R.cargando = null; toast(e.message); });
-      }
+    // Se bajan los datos una sola vez; después cada periodo se calcula al instante en el celular
+    if (!S.repBase) {
+      cargarBaseReportes();
+    } else if (R.clave !== clave) {
+      R.datos = reporte({ cobros: S.repBase.cobros, movimientos: S.repBase.movimientos, clientes: S.repBase.clientes }, configLogica(), rg.desde, rg.hasta);
+      R.clave = clave;
     }
     var d = R.clave === clave ? R.datos : null;
     var chips = [['mes', 'Este mes'], ['anterior', 'Mes anterior'], ['anio', 'Este año'], ['anioant', 'Año anterior'], ['todo', 'Todo']];
@@ -867,8 +867,61 @@
         '<p class="nota">La compra de créditos cuenta como gasto el día que se pagó al proveedor.</p>';
     }
     h += '<div class="etq" style="margin-top:18px">Descargar o enviar este reporte</div>' +
-      '<div class="opciones c3"><button class="op" id="r-pdf">PDF</button><button class="op" id="r-excel">Excel</button><button class="op" id="r-wa" style="background:var(--verde-bg);color:var(--verde-txt)">WhatsApp</button></div>';
+      '<div class="opciones c3"><button class="op" id="r-pdf">PDF</button><button class="op" id="r-excel">Excel</button><button class="op" id="r-wa" style="background:var(--verde-bg);color:var(--verde-txt)">Imagen</button></div>';
     return h;
+  }
+  function cargarBaseReportes() {
+    if (S.repCargando) return S.repCargando;
+    S.repCargando = api('datosReporte').then(function (b) {
+      S.repBase = b; S.repCargando = null; if (S.rep) S.rep.clave = null;
+      if (/^#\/reportes/.test(location.hash)) render();
+    }, function (e) { S.repCargando = null; toast(e.message); });
+    return S.repCargando;
+  }
+  /** Imagen del reporte (mismo estilo de la promo), para enviar por WhatsApp. */
+  function dibujarReporte(d, nombre, tab) {
+    var t = d.totales, n = d.negocio;
+    var filas = tab === 'clientes' ? d.porCliente.filter(function (c) { return c.pagos; }).slice(0, 8).map(function (c) { return [c.usuario, plural(c.pagos, 'pago', 'pagos') + ' · ' + plural(c.meses, 'mes', 'meses'), colones(c.total), '']; })
+      : tab === 'negocio' ? Object.keys(n.gastosPorTipo).map(function (k) { return [k, 'Gasto', colones(-n.gastosPorTipo[k]), '']; }).concat(n.repartos.map(function (r) { return ['Reparto 50/50', fechaCorta(r.fecha), colones(r.monto), '']; }))
+      : d.pagos.slice(0, 8).map(function (p) { return [p.usuario, fechaCorta(p.fecha) + ' · ' + plural(p.meses, 'mes', 'meses'), colones(p.monto), p.estado]; });
+    var extra = tab === 'pagos' ? Math.max(0, d.pagos.length - 8) : tab === 'clientes' ? Math.max(0, d.porCliente.filter(function (c) { return c.pagos; }).length - 8) : 0;
+    var W = 1080, top = 600, rowH = 92, H = top + 90 + Math.max(1, filas.length) * rowH + (extra ? 60 : 0) + 120;
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
+    var F = '-apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif', NAR = '#FF7A4D', AZ = '#0E1330', CARD = '#1A2250', T2 = '#C9CEEA', VERDE = '#5BD38A', ROJO = '#FF8A80';
+    x.fillStyle = AZ; x.fillRect(0, 0, W, H);
+    x.fillStyle = NAR; x.font = '700 26px ' + F; x.fillText('REPORTE IPTV', 72, 100);
+    x.fillStyle = '#fff'; x.font = '800 64px ' + F; x.fillText(nombre.charAt(0).toUpperCase() + nombre.slice(1), 72, 175, W - 144);
+    x.fillStyle = T2; x.font = '400 26px ' + F; x.fillText(fechaCorta(d.desde < '2001' ? (d.pagos.length ? d.pagos[d.pagos.length - 1].fecha : d.hasta) : d.desde) + ' al ' + fechaCorta(d.hasta), 72, 218);
+    var kp = function (bx, by, bw, l, v, c) {
+      x.fillStyle = CARD; redondo(x, bx, by, bw, 130, 20); x.fill();
+      x.fillStyle = T2; x.font = '400 24px ' + F; x.fillText(l, bx + 28, by + 46);
+      x.fillStyle = c || '#fff'; x.font = '800 42px ' + F; x.fillText(v, bx + 28, by + 100, bw - 50);
+    };
+    var bw3 = (W - 144 - 32) / 3;
+    kp(72, 250, bw3, 'Cobrado', colones(t.cobrado), VERDE);
+    kp(72 + bw3 + 16, 250, bw3, 'Pendiente', colones(t.pendiente), t.pendiente ? ROJO : '#fff');
+    kp(72 + (bw3 + 16) * 2, 250, bw3, 'Cobros', String(t.cobros));
+    kp(72, 396, bw3, 'Gastos', colones(-n.gastos), ROJO);
+    kp(72 + bw3 + 16, 396, bw3, 'Ganancia', colones(n.ganancia), n.ganancia >= 0 ? VERDE : ROJO);
+    kp(72 + (bw3 + 16) * 2, 396, bw3, 'Créditos usados', String(t.creditos));
+    x.fillStyle = T2; x.font = '700 24px ' + F;
+    x.fillText(tab === 'clientes' ? 'CLIENTES QUE MÁS PAGARON' : tab === 'negocio' ? 'GASTOS Y REPARTOS' : 'PAGOS', 72, top + 20);
+    if (n.repartido) { x.textAlign = 'right'; x.fillStyle = NAR; x.fillText('Repartido: ' + colones(n.repartido / 2) + ' c/u', W - 72, top + 20); x.textAlign = 'left'; }
+    x.fillStyle = CARD; redondo(x, 72, top + 44, W - 144, Math.max(1, filas.length) * rowH + 16, 22); x.fill();
+    if (!filas.length) { x.fillStyle = T2; x.font = '400 28px ' + F; x.fillText('Sin movimientos en este periodo', 108, top + 44 + 60); }
+    filas.forEach(function (f, i) {
+      var y = top + 44 + 8 + i * rowH;
+      if (i) { x.fillStyle = '#2A3366'; x.fillRect(108, y, W - 216, 2); }
+      x.fillStyle = '#fff'; x.font = '700 32px ' + F; x.fillText(f[0], 108, y + 42, 560);
+      x.fillStyle = T2; x.font = '400 24px ' + F; x.fillText(f[1], 108, y + 76, 560);
+      x.textAlign = 'right'; x.fillStyle = '#fff'; x.font = '800 32px ' + F; x.fillText(f[2], W - 108, y + (f[3] ? 42 : 56));
+      if (f[3]) { x.font = '700 22px ' + F; x.fillStyle = f[3] === 'Pagado' ? VERDE : f[3] === 'Pendiente' ? ROJO : T2; x.fillText(f[3], W - 108, y + 76); }
+      x.textAlign = 'left';
+    });
+    var yEnd = top + 44 + Math.max(1, filas.length) * rowH + 16;
+    if (extra) { x.fillStyle = T2; x.font = '400 24px ' + F; x.fillText('… y ' + extra + ' más', 108, yEnd + 44); }
+    x.fillStyle = '#5A6396'; x.font = '400 22px ' + F; x.textAlign = 'center'; x.fillText('Generado el ' + fechaCorta(S.datos.hoy) + ' · App IPTV', W / 2, H - 50); x.textAlign = 'left';
+    return new Promise(function (ok) { cv.toBlob(ok, 'image/png'); });
   }
   function textoReporte(d, nombre) {
     var t = d.totales, n = d.negocio;
@@ -1200,13 +1253,19 @@
     if ($('sync')) $('sync').onclick = function () {
       refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
     };
+    if (ruta === 'finanzas' && !S.repBase && !DEMO) cargarBaseReportes();
     if (ruta === 'reportes') {
       todos('[data-rtab]', function (x) { x.onclick = function () { S.rep.tab = x.dataset.rtab; render(); }; });
       todos('[data-rper]', function (x) { x.onclick = function () { S.rep.periodo = x.dataset.rper; render(); }; });
       if ($('rmes')) $('rmes').onchange = function () { if (this.value) { S.rep.periodo = this.value; render(); } };
       var Rd = S.rep && S.rep.datos, Rn = rangoPeriodo(S.rep.periodo).nombre;
       var nombreArch = 'Reporte-IPTV-' + Rn.replace(/\s+/g, '-') + '-' + S.rep.tab;
-      if ($('r-wa')) $('r-wa').onclick = function () { abrirWhatsApp('', textoReporte(Rd, Rn)); };
+      var fileR = null;
+      if (Rd && $('r-wa')) dibujarReporte(Rd, Rn, S.rep.tab).then(function (b) { fileR = new File([b], nombreArch + '.png', { type: 'image/png' }); });
+      if ($('r-wa')) $('r-wa').onclick = function () {
+        if (fileR) compartirArchivo(fileR, 'Reporte IPTV', false);
+        else abrirWhatsApp('', textoReporte(Rd, Rn));
+      };
       if ($('r-excel')) $('r-excel').onclick = function () {
         var f = new File([csvReporte(Rd, S.rep.tab)], nombreArch + '.csv', { type: 'text/csv' });
         compartirArchivo(f, 'Reporte IPTV', !ES_IOS);

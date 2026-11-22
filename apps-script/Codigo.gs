@@ -161,6 +161,16 @@ function ejecutar_(accion, datos, correo) {
       return conCandado_(function (db, config) { return accionGuardarControl(db, config, datos, hoy, correo); });
     case 'verContrasena':
       return verContrasena_(datos.usuario, correo);
+    case 'datosReporte': {
+      // Todo lo necesario para armar reportes en el celular (sin contraseñas ni teléfonos)
+      var dbR = cargarDb_();
+      var pick = function (l, campos) { return l.map(function (f) { var o = {}; campos.forEach(function (k) { o[k] = f[k]; }); return o; }); };
+      return {
+        cobros: pick(dbR.cobros, ['Fecha', 'Usuario', 'Tipo', 'Dispositivos', 'Meses', 'Regalía', 'Créditos', 'Monto', 'Estado', 'Forma de pago', 'Cobró']),
+        movimientos: pick(dbR.movimientos, ['Fecha', 'Tipo', 'Descripción', 'Monto', 'Nota']),
+        clientes: pick(dbR.clientes, ['Usuario', 'Creado'])
+      };
+    }
     case 'reporte':
       return reporte(cargarDb_(), leerConfig(leerTabla_('Config')), String(datos.desde), String(datos.hasta));
     case 'verContrasenas':

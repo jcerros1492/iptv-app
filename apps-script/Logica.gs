@@ -581,6 +581,68 @@ function armarEstado(db, config, hoy, correo, tipoCambio) {
   };
 }
 
+/**
+ * Reporte de un periodo (fechas 'YYYY-MM-DD', ambas incluidas).
+ * pagos: cada cobro del periodo · porCliente: totales por usuario · negocio: ingresos, gastos y ganancia.
+ */
+function reporte(db, config, desde, hasta) {
+  var dentro = function (f) { f = String(f || '').slice(0, 10); return f >= desde && f <= hasta; };
+  var cobros = db.cobros.filter(function (c) { return dentro(c.Fecha); })
+    .sort(function (a, b) { return a.Fecha < b.Fecha ? 1 : a.Fecha > b.Fecha ? -1 : 0; });
+  var pagados = cobros.filter(function (c) { return c.Estado === 'Pagado'; });
+  var suma = function (l, campo) { return l.reduce(function (t, x) { return t + numero(x[campo]); }, 0); };
+
+  var porForma = {}, porSocio = {};
+  pagados.forEach(function (c) {
+    var f = c['Forma de pago'] || 'Sin dato', q = c['Cobró'] || 'Sin dato';
+    porForma[f] = (porForma[f] || 0) + numero(c.Monto);
+    porSocio[q] = (porSocio[q] || 0) + numero(c.Monto);
+  });
+
+  var mapa = {};
+  cobros.forEach(function (c) {
+    var u = c.Usuario; if (!u) return;
+    var m = mapa[u] || (mapa[u] = { usuario: u, pagos: 0, total: 0, meses: 0, pendiente: 0, ultimo: '' });
+    if (c.Estado === 'Pagado') { m.pagos++; m.total += numero(c.Monto); m.meses += numero(c.Meses); if (c.Fecha > m.ultimo) m.ultimo = c.Fecha; }
+    if (c.Estado === 'Pendiente') m.pendiente += numero(c.Monto);
+  });
+  var porCliente = Object.keys(mapa).map(function (k) { return mapa[k]; }).sort(function (a, b) { return b.total - a.total; });
+
+  var movs = db.movimientos.filter(function (m) { return dentro(m.Fecha); });
+  var esReparto = function (m) { return /reparto|dividendo/i.test(m.Tipo); };
+  var esPrestamo = function (m) { return /préstamo|prestamo/i.test(m.Tipo); };
+  var gastosPorTipo = {};
+  movs.forEach(function (m) {
+    if (esReparto(m) || esPrestamo(m) || numero(m.Monto) >= 0) return;
+    gastosPorTipo[m.Tipo] = (gastosPorTipo[m.Tipo] || 0) + numero(m.Monto);
+  });
+  var gastos = Object.keys(gastosPorTipo).reduce(function (t, k) { return t + gastosPorTipo[k]; }, 0);
+  var otrosIngresos = movs.filter(function (m) { return !esReparto(m) && !esPrestamo(m) && numero(m.Monto) > 0; });
+  var ingresos = suma(pagados, 'Monto') + suma(otrosIngresos, 'Monto');
+  var repartos = movs.filter(esReparto).map(function (m) { return { fecha: m.Fecha, monto: -numero(m.Monto), nota: m.Nota || m['Descripción'] || '' }; });
+  var nuevos = db.clientes.filter(function (c) { return dentro(c.Creado); }).map(function (c) { return c.Usuario; });
+
+  return {
+    desde: desde, hasta: hasta,
+    totales: {
+      cobrado: suma(pagados, 'Monto'), pendiente: suma(cobros.filter(function (c) { return c.Estado === 'Pendiente'; }), 'Monto'),
+      cobros: pagados.length, creditos: suma(cobros.filter(function (c) { return c.Estado !== 'Incobrable'; }), 'Créditos'),
+      porForma: porForma, porSocio: porSocio
+    },
+    pagos: cobros.map(function (c) {
+      return { fecha: c.Fecha, usuario: c.Usuario, tipo: c.Tipo, dispositivos: numero(c.Dispositivos), meses: numero(c.Meses),
+        regalia: numero(c['Regalía']), monto: numero(c.Monto), estado: c.Estado, forma: c['Forma de pago'] || '', cobro: c['Cobró'] || '' };
+    }),
+    porCliente: porCliente,
+    negocio: {
+      ingresos: ingresos, gastos: gastos, ganancia: ingresos + gastos,
+      gastosPorTipo: gastosPorTipo, repartos: repartos,
+      repartido: repartos.reduce(function (t, r) { return t + r.monto; }, 0),
+      nuevos: nuevos
+    }
+  };
+}
+
 /** Aplica cambios a la base de datos en memoria (modo demo y pruebas). */
 function aplicarCambiosEnMemoria(db, cambios) {
   var mapa = { Clientes: 'clientes', Cobros: 'cobros', Movimientos: 'movimientos', Config: 'config', Controles: 'controles', Accesos: 'accesos' };
@@ -606,7 +668,7 @@ function aplicarCambiosEnMemoria(db, cambios) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = {
+  module.exports = { reporte: reporte,
     sumarMeses: sumarMeses, sumarDias: sumarDias, diasEntre: diasEntre, fechaCorta: fechaCorta,
     redondear: redondear, colones: colones, numero: numero, leerConfig: leerConfig, CONFIG_POR_DEFECTO: CONFIG_POR_DEFECTO,
     calcularCobro: calcularCobro, evaluarPago: evaluarPago, resumen: resumen, alertas: alertas,

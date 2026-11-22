@@ -95,5 +95,6 @@ chk('pago de deuda devuelve estado nuevo', !!r.estado);
 r = post('respuesta',{usuario:'AlexisSegura',respuesta:'Sin respuesta'});
 chk('Sin respuesta quita la alerta', r.ok && !r.estado.alertas.some(a=>a.usuario==='AlexisSegura'));
 r = post('reactivar',{usuario:'YChaconV'}); chk('reactivar excliente', r.ok && r.estado.clientes.find(c=>c.usuario==='YChaconV').estado!=='Excliente');
+r = post('verContrasenas',{}); chk('listado de contraseñas', r.ok && Object.keys(r.datos.contrasenas).length >= 5 && !/^enc:/.test(Object.values(r.datos.contrasenas)[0]));
 console.log(fallas? fallas+' con error':'Todo bien');
 process.exit(fallas?1:0);

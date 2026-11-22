@@ -1,8 +1,7 @@
 {
-  "version": "2.0",
-  "fecha": "2026-11-21",
+  "version": "2.4",
+  "fecha": "2026-11-22",
   "cambios": [
-    "Confirmación antes de No renueva / Sin respuesta",
-    "Botón Reactivar para exclientes"
+    "Finanzas: créditos disponibles en grande"
   ]
 }

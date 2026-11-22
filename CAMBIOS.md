@@ -4,6 +4,37 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.4 · 22 nov 2026
+- Finanzas: arriba en grande los créditos disponibles (con cuántos se usaron en 30 días y para
+  cuántos meses alcanzan) y el dinero en el sobre. Aviso si quedan menos de 30 créditos.
+- El cuadre con el banco y el panel queda en una sola línea ("Cuadra ✓"); se toca para ver el
+  detalle. Se abre solo si algo no cuadra.
+- Incluye la 2.3.
+- Motor: no (si no instaló la 2.3, pegue Codigo.gs y Logica.gs de la 2.3).
+
+## 2.3 · 22 nov 2026
+- Nuevo: Reportes (Finanzas → "Reportes"). Periodos: este mes, mes anterior, este año,
+  año anterior, todo, o escoger un mes.
+  · Pagos: cobrado, pendiente y cantidad de cobros, con la lista de cada pago.
+  · Por cliente: cuánto pagó cada cliente en el periodo, de mayor a menor.
+  · Negocio: ingresos, gastos por tipo, ganancia, repartos 50/50, créditos usados y clientes nuevos.
+  · Descargar en PDF o Excel, o enviar el resumen por WhatsApp.
+- Motor: SÍ → copiar Codigo.gs y Logica.gs a Apps Script y hacer Nueva versión.
+
+## 2.2 · 22 nov 2026
+- Las contraseñas (ver, copiar, enviar por WhatsApp y Listado general) solo se pueden usar si el
+  celular tiene activado Face ID (iPhone) o huella (Android). Si no, la app lleva a Ajustes
+  para activarlo. El PIN queda solo como respaldo cuando Face ID / huella falla.
+- Incluye la 2.1.
+- Motor: no (si no instaló la 2.1, pegue el Codigo.gs de la 2.1).
+
+## 2.1 · 22 nov 2026
+- Nuevo: Listado general (Clientes → "Listado general"). Todos los clientes en el orden en que
+  les toca renovar, con vencimiento, dispositivos y botón para copiar el usuario.
+  "Mostrar contraseñas" pide Face ID una vez y las muestra todas durante 1 minuto, con botón
+  para copiar cada una. Queda anotado en la pestaña Accesos.
+- Motor: SÍ → copiar Codigo.gs a Apps Script y hacer Nueva versión.
+
 ## 2.0 · 21 nov 2026
 - Antes de guardar "No renueva", "Sin respuesta" o "Va a renovar" la app pregunta si está seguro.
 - Ficha de un excliente: botón "Reactivar" para devolverlo a activo (si se pasó por error).

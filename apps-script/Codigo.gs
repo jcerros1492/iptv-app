@@ -161,6 +161,10 @@ function ejecutar_(accion, datos, correo) {
       return conCandado_(function (db, config) { return accionGuardarControl(db, config, datos, hoy, correo); });
     case 'verContrasena':
       return verContrasena_(datos.usuario, correo);
+    case 'reporte':
+      return reporte(cargarDb_(), leerConfig(leerTabla_('Config')), String(datos.desde), String(datos.hasta));
+    case 'verContrasenas':
+      return verContrasenas_(correo);
     case 'tipoCambioManual': {
       var venta = numero(datos.venta);
       if (!(venta > 300 && venta < 1000)) throw new Error('Tipo de cambio no válido.');
@@ -207,6 +211,18 @@ function verContrasena_(usuario, correo) {
   var config = leerConfig(leerTabla_('Config'));
   registrarAcceso_(nombreSocio(config, correo), 'Vio contraseña', usuario);
   return { usuario: usuario, contrasena: descifrar_(cli['Contraseña']) };
+}
+
+/** Todas las contraseñas de los clientes (menos exclientes), para el listado general. */
+function verContrasenas_(correo) {
+  var out = {};
+  leerTabla_('Clientes').forEach(function (f) {
+    if (f.Estado === 'Excliente' || !f['Contraseña']) return;
+    try { out[f.Usuario] = descifrar_(f['Contraseña']); } catch (e) { out[f.Usuario] = '(no se pudo leer)'; }
+  });
+  var config = leerConfig(leerTabla_('Config'));
+  registrarAcceso_(nombreSocio(config, correo), 'Vio contraseñas', 'Listado general (' + Object.keys(out).length + ')');
+  return { contrasenas: out };
 }
 
 function registrarAcceso_(quien, accion, detalle) {

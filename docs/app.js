@@ -50,6 +50,8 @@
     atras: '<path d="m15 18-6-6 6-6"/>', cerrar: '<path d="M18 6 6 18M6 6l12 12"/>',
     wa: '<path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.5A8.4 8.4 0 1 1 21 11.5z"/>',
     ojo: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    llave: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
+    lista: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     copiar: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
     buscar: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     lapiz: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
@@ -88,6 +90,11 @@
             if (accion === 'verContrasena') {
               var c = db.clientes.filter(function (x) { return x.Usuario === datos.usuario; })[0];
               return ok({ usuario: datos.usuario, contrasena: c ? c['Contraseña'] : '' });
+            }
+            if (accion === 'reporte') return ok(reporte(db, config, datos.desde, datos.hasta));
+            if (accion === 'verContrasenas') {
+              var m = {}; db.clientes.forEach(function (x) { if (x.Estado !== 'Excliente') m[x.Usuario] = x['Contraseña']; });
+              return ok({ contrasenas: m });
             }
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
@@ -302,6 +309,12 @@
   /** Pide Face ID / huella antes de algo delicado (ver contraseñas). */
   function confirmarIdentidad() {
     var b = bloqueo();
+    // Sin Face ID / huella activado en este celular no se pueden ver contraseñas
+    if (!b && !DEMO) {
+      toast('Primero active ' + nombreBiometria() + ' en Ajustes');
+      setTimeout(function () { ir('#/ajustes'); }, 900);
+      return Promise.reject(new Error('cancelado'));
+    }
     if (!b) return Promise.resolve(true);
     // Una vez confirmado, no se vuelve a pedir durante 5 minutos (para ver varias contraseñas seguidas)
     if (S.identidadHasta && Date.now() < S.identidadHasta) return Promise.resolve(true);
@@ -431,6 +444,8 @@
       '<div class="filtros">' + Object.keys(grupos).map(function (k) {
         return '<button class="filtro' + (S.filtro === k && !S.busqueda ? ' sel' : '') + '" data-filtro="' + k + '">' + k + ' ' + grupos[k].length + '</button>';
       }).join('') + '</div>' +
+      '<a class="aviso" href="#/lista" style="text-decoration:none;color:inherit;margin-top:8px;background:var(--gris-bg,#EFEEEC);color:var(--texto)">' + ico('lista') +
+      '<div><b>Listado general</b>Todos los usuarios con contraseña y vencimiento</div></a>' +
       '<div class="card" style="margin-top:8px" id="lista">' + (lista.length ? lista.map(function (c) {
         if (c.estado === 'Excliente') {
           return '<div class="fila"><a class="txt" style="text-decoration:none;color:inherit" href="#/cliente/' + encodeURIComponent(c.usuario) + '"><span class="t1">' + esc(c.usuario) +
@@ -616,8 +631,8 @@
 
   /** Abre WhatsApp. En iPhone se abre la app directo (sin dejar una pestaña en blanco al volver). */
   function abrirWhatsApp(tel, texto) {
-    var num = telefonoWhatsApp(tel), t = texto ? encodeURIComponent(texto) : '';
-    if (ES_IOS) { location.href = 'whatsapp://send?phone=' + num + (t ? '&text=' + t : ''); return; }
+    var num = tel ? telefonoWhatsApp(tel) : '', t = texto ? encodeURIComponent(texto) : '';
+    if (ES_IOS) { location.href = 'whatsapp://send?' + (num ? 'phone=' + num + '&' : '') + (t ? 'text=' + t : ''); return; }
     window.open('https://wa.me/' + num + (t ? '?text=' + t : ''), '_blank');
   }
   /* --- Promoción para clientes nuevos --- */
@@ -742,18 +757,29 @@
   function pFinanzas() {
     var r = S.datos.resumen, ctrl = r.control;
     var cuadraS = ctrl && Math.abs(ctrl.difSobre) < 1, cuadraC = ctrl && ctrl.difCreditos === 0;
-    return banner() + '<div class="top"><h1>Finanzas</h1></div>' +
-      '<div class="card pad" style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:14px">Sobre BCR</b>' +
-      (ctrl ? '<span class="chip ' + (cuadraS ? 'verde' : 'naranja') + '">' + (cuadraS ? 'Cuadra' : 'Revisar') + '</span>' : '') + '</div>' +
-      '<div class="dato"><span class="l">Según la app</span><span class="v">' + colones(r.sobreEnBanco) + '</span></div>' +
-      (ctrl ? '<div class="dato"><span class="l">Real en el banco (' + fechaCorta(ctrl.fecha) + ')</span><span class="v">' + colones(ctrl.sobreReal) + '</span></div>' +
-        '<div class="dato"><span class="l">Diferencia</span><span class="v" style="color:' + (cuadraS ? 'var(--verde-txt)' : 'var(--naranja-txt)') + '">' + colones(ctrl.difSobre) + '</span></div>' : '') +
-      (r.sinDepositar ? '<div class="nota">' + colones(r.sinDepositar) + ' cobrados todavía no están en el sobre.</div>' : '') + '</div>' +
-      '<div class="card pad" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:14px">Créditos</b>' +
-      (ctrl ? '<span class="chip ' + (cuadraC ? 'verde' : 'naranja') + '">' + (cuadraC ? 'Cuadra' : 'Faltan ' + Math.abs(ctrl.difCreditos)) + '</span>' : '') + '</div>' +
-      '<div class="dato"><span class="l">Según la app</span><span class="v">' + r.creditos + '</span></div>' +
-      (ctrl ? '<div class="dato"><span class="l">En el panel (' + fechaCorta(ctrl.fecha) + ')</span><span class="v">' + ctrl.creditosPanel + '</span></div>' : '') + '</div>' +
-      '<button class="btn sec" id="control" style="margin-top:10px">Actualizar con el banco y el panel</button>' +
+    // Cuántos créditos se gastaron en los últimos 30 días, para estimar cuánto alcanzan
+    var hace30 = sumarDias(S.datos.hoy, -30), uso30 = 0;
+    S.datos.cobros.forEach(function (x) { if (x.Fecha >= hace30 && x.Estado !== 'Incobrable') uso30 += numero(x['Créditos']); });
+    var alcanza = uso30 > 0 ? Math.floor(r.creditos / uso30) : null;
+    var todoCuadra = ctrl && cuadraS && cuadraC;
+    return banner() + '<div class="top"><h1>Finanzas</h1><a class="btn chico" href="#/reportes">Reportes</a></div>' +
+      '<div class="tiles" style="grid-template-columns:repeat(2,1fr)">' +
+      '<div class="tile" style="padding:16px"><span>Créditos disponibles</span><b style="font-size:44px;line-height:1.05;margin-top:4px;color:' + (r.creditos < 30 ? 'var(--rojo-txt)' : 'var(--texto)') + '">' + r.creditos + '</b>' +
+        '<span style="font-size:12px;margin-top:4px">' + (uso30 ? uso30 + ' usados en 30 días' + (alcanza !== null ? ' · alcanzan ~' + plural(alcanza, 'mes', 'meses') : '') : '') + '</span></div>' +
+      '<div class="tile" style="padding:16px"><span>En el sobre BCR</span><b style="font-size:26px;line-height:1.15;margin-top:10px">' + colones(r.sobreEnBanco) + '</b>' +
+        '<span style="font-size:12px;margin-top:4px">' + (r.sinDepositar ? colones(r.sinDepositar) + ' sin depositar' : 'Todo depositado') + '</span></div></div>' +
+      (r.creditos < 30 ? '<div class="aviso" style="margin-top:10px">' + ico('alerta') + '<div><b>Quedan pocos créditos</b>Conviene comprar más al proveedor.</div></div>' : '') +
+      '<details class="card pad" style="margin-top:10px"' + (ctrl && !todoCuadra ? ' open' : '') + '><summary style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none">' +
+        '<b style="font-size:14px">Cuadre con el banco y el panel</b>' +
+        (ctrl ? '<span class="chip ' + (todoCuadra ? 'verde' : 'naranja') + '">' + (todoCuadra ? 'Cuadra ✓' : 'Revisar') + '</span>' : '<span class="chip">Sin revisar</span>') + '</summary>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">' +
+        (ctrl ? '<div class="nota" style="margin:0">Última revisión: ' + fechaCorta(ctrl.fecha) + '</div>' +
+          '<div class="dato"><span class="l">Sobre según la app</span><span class="v">' + colones(r.sobreEnBanco) + '</span></div>' +
+          '<div class="dato"><span class="l">Sobre real en el banco</span><span class="v">' + colones(ctrl.sobreReal) + '</span></div>' +
+          '<div class="dato"><span class="l">Diferencia</span><span class="v" style="color:' + (cuadraS ? 'var(--verde-txt)' : 'var(--naranja-txt)') + '">' + colones(ctrl.difSobre) + '</span></div>' +
+          '<div class="dato"><span class="l">Créditos según la app</span><span class="v">' + r.creditos + '</span></div>' +
+          '<div class="dato"><span class="l">Créditos en el panel</span><span class="v">' + ctrl.creditosPanel + (cuadraC ? '' : ' <small style="color:var(--naranja-txt)">(' + (ctrl.difCreditos > 0 ? '+' : '') + ctrl.difCreditos + ')</small>') + '</span></div>' : '') +
+        '<button class="btn sec" id="control">Actualizar con el banco y el panel</button></div></details>' +
       '<div class="card pad" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"><b style="font-size:14px;margin-bottom:4px">Para repartir (50/50)</b>' +
       '<div class="dato"><span class="l">Hay en el sobre</span><span class="v">' + colones(r.sobre) + '</span></div>' +
       '<div class="dato"><span class="l">Reserva para créditos</span><span class="v" style="color:var(--naranja-txt);white-space:nowrap">' + colones(-r.reserva) + '</span></div>' +
@@ -769,6 +795,130 @@
         return '<a class="fila" href="#/cliente/' + encodeURIComponent(x.Usuario) + '"><span class="txt"><span class="t1">' + esc(x.Usuario) + '</span><span class="t2">' + fechaCorta(x.Fecha) +
           (x['Cobró'] ? ' · ' + esc(x['Cobró']) : '') + '</span></span><span style="text-align:right"><b style="font-size:14px;display:block">' + colones(numero(x.Monto)) + '</b><span class="chip ' + (x.Estado === 'Pagado' ? 'verde' : x.Estado === 'Pendiente' ? 'naranja' : '') + '">' + esc(x.Estado) + '</span></span></a>';
       }).join('') + '</div>';
+  }
+
+  /* --- Reportes --- */
+  var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
+  function rangoPeriodo(p) {
+    var h = S.datos.hoy, a = Number(h.slice(0, 4)), m = Number(h.slice(5, 7));
+    var dosD = function (n) { return (n < 10 ? '0' : '') + n; };
+    var finMes = function (y, mm) { return sumarDias(sumarMeses(y + '-' + dosD(mm) + '-01', 1), -1); };
+    if (p === 'mes') return { desde: a + '-' + dosD(m) + '-01', hasta: h, nombre: MESES[m - 1] + ' ' + a };
+    if (p === 'anterior') { var y = m === 1 ? a - 1 : a, mm = m === 1 ? 12 : m - 1; return { desde: y + '-' + dosD(mm) + '-01', hasta: finMes(y, mm), nombre: MESES[mm - 1] + ' ' + y }; }
+    if (p === 'anio') return { desde: a + '-01-01', hasta: h, nombre: 'año ' + a };
+    if (p === 'anioant') return { desde: (a - 1) + '-01-01', hasta: (a - 1) + '-12-31', nombre: 'año ' + (a - 1) };
+    if (p === 'todo') return { desde: '2000-01-01', hasta: h, nombre: 'todo' };
+    if (/^\d{4}-\d{2}$/.test(p)) { var yy = Number(p.slice(0, 4)), m2 = Number(p.slice(5)); return { desde: p + '-01', hasta: finMes(yy, m2), nombre: MESES[m2 - 1] + ' ' + yy }; }
+    return rangoPeriodo('mes');
+  }
+  function pReportes() {
+    if (!S.rep) S.rep = { tab: 'pagos', periodo: 'mes' };
+    var R = S.rep, rg = rangoPeriodo(R.periodo), clave = rg.desde + '|' + rg.hasta;
+    if (!R.datos || R.clave !== clave) {
+      if (R.cargando !== clave) {
+        R.cargando = clave;
+        api('reporte', { desde: rg.desde, hasta: rg.hasta }).then(function (d) {
+          R.datos = d; R.clave = clave; R.cargando = null; if (/^#\/reportes/.test(location.hash)) render();
+        }, function (e) { R.cargando = null; toast(e.message); });
+      }
+    }
+    var d = R.clave === clave ? R.datos : null;
+    var chips = [['mes', 'Este mes'], ['anterior', 'Mes anterior'], ['anio', 'Este año'], ['anioant', 'Año anterior'], ['todo', 'Todo']];
+    var h = barra('Reportes', '#/finanzas') +
+      '<div class="seg">' + [['pagos', 'Pagos'], ['clientes', 'Por cliente'], ['negocio', 'Negocio']].map(function (t) {
+        return '<button class="' + (R.tab === t[0] ? 'sel' : '') + '" data-rtab="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div>' +
+      '<div class="filtros" style="margin-top:12px">' + chips.map(function (c) {
+        return '<button class="filtro' + (R.periodo === c[0] ? ' sel' : '') + '" data-rper="' + c[0] + '">' + c[1] + '</button>';
+      }).join('') +
+      '<label class="filtro' + (/^\d{4}-\d{2}$/.test(R.periodo) ? ' sel' : '') + '" style="position:relative">' + (/^\d{4}-\d{2}$/.test(R.periodo) ? esc(rg.nombre) : 'Escoger mes…') +
+      '<input type="month" id="rmes" style="position:absolute;inset:0;opacity:0" value="' + (/^\d{4}-\d{2}$/.test(R.periodo) ? R.periodo : '') + '"></label></div>';
+    if (!d) return h + '<div class="cargando">Armando el reporte…</div>';
+    var t = d.totales, kpi = function (l, v, c) { return '<div class="card pad" style="flex:1;min-width:0"><div class="nota" style="margin:0">' + l + '</div><div style="font-weight:800;font-size:20px;color:' + (c || 'inherit') + '">' + v + '</div></div>'; };
+    if (R.tab === 'pagos') {
+      h += '<div style="display:flex;gap:8px;margin-top:12px">' + kpi('Cobrado', colones(t.cobrado), 'var(--verde-txt)') + kpi('Pendiente', colones(t.pendiente), t.pendiente ? 'var(--rojo-txt)' : '') + kpi('Cobros', t.cobros) + '</div>';
+      var formas = Object.keys(t.porForma).filter(function (k) { return k !== 'Sin dato'; });
+      if (formas.length) h += '<p class="nota">' + formas.map(function (k) { return esc(k) + ' ' + colones(t.porForma[k]); }).join(' · ') + '</p>';
+      h += '<div class="card" style="margin-top:10px">' + (d.pagos.length ? d.pagos.map(function (p) {
+        var est = p.estado === 'Pagado' ? 'verde' : p.estado === 'Pendiente' ? 'rojo' : '';
+        return '<a class="fila" style="text-decoration:none;color:inherit" href="#/cliente/' + encodeURIComponent(p.usuario) + '"><div style="width:44px;text-align:center;flex:0 0 auto"><b style="font-size:18px">' + Number(p.fecha.slice(8, 10)) + '</b><div class="nota" style="margin:0;text-transform:uppercase">' + MESES[Number(p.fecha.slice(5, 7)) - 1].slice(0, 3) + '</div></div>' +
+          '<span class="txt"><span class="t1">' + esc(p.usuario) + '</span><span class="t2">' + (p.tipo === 'Pago de deuda' ? 'Pago de deuda' : (p.dispositivos ? disp(p.dispositivos) + ' · ' : '') + plural(p.meses, 'mes', 'meses') + (p.regalia ? ' +' + p.regalia : '')) + '</span></span>' +
+          '<span style="text-align:right;flex:0 0 auto"><b>' + colones(p.monto) + '</b><br><span class="chip ' + est + '">' + esc(p.estado) + '</span></span></a>';
+      }).join('') : '<div class="vacio">No hay cobros en ' + esc(rg.nombre) + '</div>') + '</div>';
+    } else if (R.tab === 'clientes') {
+      h += '<p class="nota">' + d.porCliente.filter(function (c) { return c.pagos; }).length + ' clientes pagaron en ' + esc(rg.nombre) + ', de mayor a menor.</p>';
+      h += '<div class="card">' + (d.porCliente.length ? d.porCliente.map(function (c) {
+        return '<a class="fila" style="text-decoration:none;color:inherit" href="#/cliente/' + encodeURIComponent(c.usuario) + '"><span class="txt"><span class="t1">' + esc(c.usuario) + '</span><span class="t2">' +
+          plural(c.pagos, 'pago', 'pagos') + ' · ' + plural(c.meses, 'mes', 'meses') + (c.ultimo ? ' · último ' + fechaCorta(c.ultimo) : '') + (c.pendiente ? ' · <span style="color:var(--rojo-txt)">debe ' + colones(c.pendiente) + '</span>' : '') + '</span></span>' +
+          '<b style="flex:0 0 auto">' + colones(c.total) + '</b></a>';
+      }).join('') : '<div class="vacio">Nadie pagó en ' + esc(rg.nombre) + '</div>') + '</div>';
+    } else {
+      var n = d.negocio;
+      h += '<div style="display:flex;gap:8px;margin-top:12px">' + kpi('Ingresos', colones(n.ingresos), 'var(--verde-txt)') + kpi('Gastos', colones(-n.gastos), 'var(--rojo-txt)') + '</div>' +
+        '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><b>Ganancia</b><b style="font-size:22px;color:' + (n.ganancia >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + colones(n.ganancia) + '</b></div>' +
+        '<div class="etq">Gastos</div><div class="card">' + (Object.keys(n.gastosPorTipo).length ? Object.keys(n.gastosPorTipo).sort(function (a, b) { return n.gastosPorTipo[a] - n.gastosPorTipo[b]; }).map(function (k) {
+          return '<div class="dato"><span class="l">' + esc(k) + '</span><span class="v">' + colones(-n.gastosPorTipo[k]) + '</span></div>';
+        }).join('') : '<div class="vacio">Sin gastos</div>') + '</div>' +
+        '<div class="etq">Repartido 50/50</div><div class="card">' + (n.repartos.length ? n.repartos.map(function (r) {
+          return '<div class="dato"><span class="l">' + fechaCorta(r.fecha) + (r.nota ? '<br><small>' + esc(r.nota) + '</small>' : '') + '</span><span class="v">' + colones(r.monto) + '</span></div>';
+        }).join('') + '<div class="dato"><span class="l"><b>Total · cada socio ' + colones(n.repartido / 2) + '</b></span><span class="v"><b>' + colones(n.repartido) + '</b></span></div>' : '<div class="vacio">No hubo repartos</div>') + '</div>' +
+        '<div class="card pad" style="margin-top:8px"><div class="dato" style="border:0;padding:0"><span class="l">Créditos usados</span><span class="v">' + t.creditos + '</span></div>' +
+        '<div class="dato" style="border:0;padding:8px 0 0"><span class="l">Clientes nuevos</span><span class="v">' + n.nuevos.length + '</span></div></div>' +
+        '<p class="nota">La compra de créditos cuenta como gasto el día que se pagó al proveedor.</p>';
+    }
+    h += '<div class="etq" style="margin-top:18px">Descargar o enviar este reporte</div>' +
+      '<div class="opciones c3"><button class="op" id="r-pdf">PDF</button><button class="op" id="r-excel">Excel</button><button class="op" id="r-wa" style="background:var(--verde-bg);color:var(--verde-txt)">WhatsApp</button></div>';
+    return h;
+  }
+  function textoReporte(d, nombre) {
+    var t = d.totales, n = d.negocio;
+    return 'Reporte IPTV · ' + nombre + '\n\n' +
+      'Cobrado: ' + colones(t.cobrado) + ' (' + plural(t.cobros, 'cobro', 'cobros') + ')\n' +
+      (t.pendiente ? 'Pendiente: ' + colones(t.pendiente) + '\n' : '') +
+      'Gastos: ' + colones(-n.gastos) + '\n' +
+      'Ganancia: ' + colones(n.ganancia) + '\n' +
+      (n.repartido ? 'Repartido 50/50: ' + colones(n.repartido) + ' (' + colones(n.repartido / 2) + ' c/u)\n' : '') +
+      'Créditos usados: ' + t.creditos + '\n' +
+      (n.nuevos.length ? 'Clientes nuevos: ' + n.nuevos.length + '\n' : '');
+  }
+  function csvReporte(d, tab) {
+    var q = function (v) { v = String(v == null ? '' : v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var filas;
+    if (tab === 'clientes') filas = [['Usuario', 'Pagos', 'Meses', 'Total pagado', 'Debe', 'Último pago']].concat(d.porCliente.map(function (c) { return [c.usuario, c.pagos, c.meses, Math.round(c.total), Math.round(c.pendiente), fechaCorta(c.ultimo)]; }));
+    else if (tab === 'negocio') {
+      var n = d.negocio;
+      filas = [['Concepto', 'Monto']].concat([['Ingresos', Math.round(n.ingresos)]],
+        Object.keys(n.gastosPorTipo).map(function (k) { return ['Gasto: ' + k, Math.round(n.gastosPorTipo[k])]; }),
+        [['Ganancia', Math.round(n.ganancia)], ['Repartido 50/50', Math.round(n.repartido)], ['Créditos usados', d.totales.creditos], ['Clientes nuevos', n.nuevos.length]]);
+    } else filas = [['Fecha', 'Usuario', 'Tipo', 'Dispositivos', 'Meses', 'Regalía', 'Monto', 'Estado', 'Forma de pago', 'Cobró']].concat(d.pagos.map(function (p) {
+      return [fechaCorta(p.fecha), p.usuario, p.tipo, p.dispositivos || '', p.meses, p.regalia || '', Math.round(p.monto), p.estado, p.forma, p.cobro];
+    }));
+    return '﻿' + filas.map(function (f) { return f.map(q).join(';'); }).join('\r\n');
+  }
+
+  /* --- Listado general: usuarios, contraseñas y vencimientos --- */
+  function pLista() {
+    var incluirEx = !!S.listaEx;
+    var lista = ordenarPorVencimiento(S.datos.clientes.filter(function (c) { return incluirEx || c.estado !== 'Excliente'; }));
+    var pw = S.listaPw && Date.now() < S.listaPw.hasta ? S.listaPw.v : null;
+    return barra('Listado general', '#/clientes') +
+      '<p class="nota" style="margin:0 0 10px">' + lista.length + ' clientes, en el orden en que les toca renovar.</p>' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+      '<button class="btn' + (pw ? ' sec' : '') + '" id="lista-pw" style="flex:1 1 0;width:auto;white-space:nowrap">' + (pw ? 'Ocultar contraseñas' : 'Mostrar contraseñas') + '</button>' +
+      '<button class="btn sec" id="lista-ex" style="flex:0 0 auto;width:auto;padding:0 16px;white-space:nowrap">' + (incluirEx ? 'Sin exclientes' : '+ Exclientes') + '</button></div>' +
+      '<div class="card">' + lista.map(function (c) {
+        var color = c.estado === 'Vencido' ? 'var(--rojo-txt)' : c.estado === 'Por vencer' ? '#9A5B00' : c.estado === 'Excliente' ? 'var(--suave)' : 'var(--medio)';
+        var clave = pw ? (pw[c.usuario] || '—') : '••••••';
+        return '<div class="fila" style="align-items:center;gap:10px"><a class="txt" style="text-decoration:none;color:inherit;min-width:0" href="#/cliente/' + encodeURIComponent(c.usuario) + '">' +
+          '<span class="t1">' + esc(c.usuario) + '</span>' +
+          '<span class="t2" style="color:' + color + '">' + (c.estado === 'Excliente' ? 'Excliente' : 'Vence ' + fechaCorta(c.vence)) + ' · ' + c.dispositivos + ' disp.</span>' +
+          '<span class="t2" style="font-family:ui-monospace,Menlo,monospace;color:var(--texto);word-break:break-all">' + esc(clave) + '</span></a>' +
+          '<div style="display:flex;gap:4px;flex:0 0 auto">' +
+          '<button class="icon-btn plano" data-copiar-u="' + esc(c.usuario) + '" aria-label="Copiar usuario" title="Copiar usuario">' + ico('copiar') + '</button>' +
+          (pw && pw[c.usuario] ? '<button class="icon-btn plano" data-copiar-p="' + esc(c.usuario) + '" aria-label="Copiar contraseña" title="Copiar contraseña">' + ico('llave') + '</button>' : '') +
+          '</div></div>';
+      }).join('') + '</div>' +
+      (pw ? '<p class="nota" style="text-align:center">Las contraseñas se ocultan solas en 1 minuto.</p>' : '');
   }
 
   /* --- Pago de deuda --- */
@@ -828,7 +978,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -1050,6 +1200,37 @@
     if ($('sync')) $('sync').onclick = function () {
       refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
     };
+    if (ruta === 'reportes') {
+      todos('[data-rtab]', function (x) { x.onclick = function () { S.rep.tab = x.dataset.rtab; render(); }; });
+      todos('[data-rper]', function (x) { x.onclick = function () { S.rep.periodo = x.dataset.rper; render(); }; });
+      if ($('rmes')) $('rmes').onchange = function () { if (this.value) { S.rep.periodo = this.value; render(); } };
+      var Rd = S.rep && S.rep.datos, Rn = rangoPeriodo(S.rep.periodo).nombre;
+      var nombreArch = 'Reporte-IPTV-' + Rn.replace(/\s+/g, '-') + '-' + S.rep.tab;
+      if ($('r-wa')) $('r-wa').onclick = function () { abrirWhatsApp('', textoReporte(Rd, Rn)); };
+      if ($('r-excel')) $('r-excel').onclick = function () {
+        var f = new File([csvReporte(Rd, S.rep.tab)], nombreArch + '.csv', { type: 'text/csv' });
+        compartirArchivo(f, 'Reporte IPTV', !ES_IOS);
+      };
+      if ($('r-pdf')) $('r-pdf').onclick = function () {
+        document.body.classList.add('imprimiendo'); window.print();
+        setTimeout(function () { document.body.classList.remove('imprimiendo'); }, 1000);
+      };
+    }
+    if (ruta === 'lista') {
+      $('lista-ex').onclick = function () { S.listaEx = !S.listaEx; render(); };
+      $('lista-pw').onclick = function () {
+        if (S.listaPw && Date.now() < S.listaPw.hasta) { S.listaPw = null; render(); return; }
+        var b = this; b.disabled = true; b.textContent = 'Verificando…';
+        confirmarIdentidad().then(function () { return api('verContrasenas'); }).then(function (r) {
+          S.listaPw = { v: r.contrasenas, hasta: Date.now() + 60000 };
+          clearTimeout(S.listaTimer);
+          S.listaTimer = setTimeout(function () { S.listaPw = null; if (/^#\/lista/.test(location.hash)) render(); }, 60000);
+          render();
+        }, function (e) { if (e && e.message !== 'cancelado') toast(e.message); render(); });
+      };
+      todos('[data-copiar-u]', function (x) { x.onclick = function () { var v = x.dataset.copiarU; copiarTexto(v).then(function () { toast('Usuario copiado: ' + v); }, function () { toast('No se pudo copiar'); }); }; });
+      todos('[data-copiar-p]', function (x) { x.onclick = function () { var v = S.listaPw && S.listaPw.v[x.dataset.copiarP]; if (v) copiarTexto(v).then(function () { toast('Contraseña copiada'); }, function () { toast('No se pudo copiar'); }); }; });
+    }
     if (ruta === 'deuda' && $('deuda-ok')) {
       todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = numero($('deuda-monto').value); render(); }; });
       todos('[data-deuda]', function (x) {

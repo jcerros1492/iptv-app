@@ -50,6 +50,8 @@
     atras: '<path d="m15 18-6-6 6-6"/>', cerrar: '<path d="M18 6 6 18M6 6l12 12"/>',
     wa: '<path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.5A8.4 8.4 0 1 1 21 11.5z"/>',
     ojo: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    alerta: '<path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5M12 18h.01"/>',
+    flecha: '<path d="m9 6 6 6-6 6"/>',
     llave: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
     lista: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     copiar: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
@@ -831,27 +833,13 @@
       '<div class="filtros" style="margin-top:12px">' + chips.map(function (c) {
         return '<button class="filtro' + (R.periodo === c[0] ? ' sel' : '') + '" data-rper="' + c[0] + '">' + c[1] + '</button>';
       }).join('') +
-      '<label class="filtro' + (/^\d{4}-\d{2}$/.test(R.periodo) ? ' sel' : '') + '" style="position:relative">' + (/^\d{4}-\d{2}$/.test(R.periodo) ? esc(rg.nombre) : 'Escoger mes…') +
+      '<label class="filtro' + (/^\d{4}-\d{2}$/.test(R.periodo) ? ' sel' : '') + '" style="position:relative;display:inline-flex;align-items:center">' + (/^\d{4}-\d{2}$/.test(R.periodo) ? esc(rg.nombre) : 'Escoger mes…') +
       '<input type="month" id="rmes" style="position:absolute;inset:0;opacity:0" value="' + (/^\d{4}-\d{2}$/.test(R.periodo) ? R.periodo : '') + '"></label></div>';
     if (!d) return h + '<div class="cargando">Armando el reporte…</div>';
-    var t = d.totales, kpi = function (l, v, c) { return '<div class="card pad" style="flex:1;min-width:0"><div class="nota" style="margin:0">' + l + '</div><div style="font-weight:800;font-size:20px;color:' + (c || 'inherit') + '">' + v + '</div></div>'; };
-    if (R.tab === 'pagos') {
-      h += '<div style="display:flex;gap:8px;margin-top:12px">' + kpi('Cobrado', colones(t.cobrado), 'var(--verde-txt)') + kpi('Pendiente', colones(t.pendiente), t.pendiente ? 'var(--rojo-txt)' : '') + kpi('Cobros', t.cobros) + '</div>';
-      var formas = Object.keys(t.porForma).filter(function (k) { return k !== 'Sin dato'; });
-      if (formas.length) h += '<p class="nota">' + formas.map(function (k) { return esc(k) + ' ' + colones(t.porForma[k]); }).join(' · ') + '</p>';
-      h += '<div class="card" style="margin-top:10px">' + (d.pagos.length ? d.pagos.map(function (p) {
-        var est = p.estado === 'Pagado' ? 'verde' : p.estado === 'Pendiente' ? 'rojo' : '';
-        return '<a class="fila" style="text-decoration:none;color:inherit" href="#/cliente/' + encodeURIComponent(p.usuario) + '"><div style="width:44px;text-align:center;flex:0 0 auto"><b style="font-size:18px">' + Number(p.fecha.slice(8, 10)) + '</b><div class="nota" style="margin:0;text-transform:uppercase">' + MESES[Number(p.fecha.slice(5, 7)) - 1].slice(0, 3) + '</div></div>' +
-          '<span class="txt"><span class="t1">' + esc(p.usuario) + '</span><span class="t2">' + (p.tipo === 'Pago de deuda' ? 'Pago de deuda' : (p.dispositivos ? disp(p.dispositivos) + ' · ' : '') + plural(p.meses, 'mes', 'meses') + (p.regalia ? ' +' + p.regalia : '')) + '</span></span>' +
-          '<span style="text-align:right;flex:0 0 auto"><b>' + colones(p.monto) + '</b><br><span class="chip ' + est + '">' + esc(p.estado) + '</span></span></a>';
-      }).join('') : '<div class="vacio">No hay cobros en ' + esc(rg.nombre) + '</div>') + '</div>';
-    } else if (R.tab === 'clientes') {
-      h += '<p class="nota">' + d.porCliente.filter(function (c) { return c.pagos; }).length + ' clientes pagaron en ' + esc(rg.nombre) + ', de mayor a menor.</p>';
-      h += '<div class="card">' + (d.porCliente.length ? d.porCliente.map(function (c) {
-        return '<a class="fila" style="text-decoration:none;color:inherit" href="#/cliente/' + encodeURIComponent(c.usuario) + '"><span class="txt"><span class="t1">' + esc(c.usuario) + '</span><span class="t2">' +
-          plural(c.pagos, 'pago', 'pagos') + ' · ' + plural(c.meses, 'mes', 'meses') + (c.ultimo ? ' · último ' + fechaCorta(c.ultimo) : '') + (c.pendiente ? ' · <span style="color:var(--rojo-txt)">debe ' + colones(c.pendiente) + '</span>' : '') + '</span></span>' +
-          '<b style="flex:0 0 auto">' + colones(c.total) + '</b></a>';
-      }).join('') : '<div class="vacio">Nadie pagó en ' + esc(rg.nombre) + '</div>') + '</div>';
+    var t = d.totales, kpi = kpiR;
+    if (R.tab === 'pagos' || R.tab === 'clientes') {
+      h += '<div class="buscar" style="margin-top:12px">' + ico('buscar') + '<input id="rbuscar" type="search" placeholder="Buscar por nombre, usuario o teléfono" value="' + esc(R.buscar || '') + '" autocomplete="off"></div>' +
+        '<div id="rep-cuerpo">' + cuerpoReporte(d, rg) + '</div>';
     } else {
       var n = d.negocio;
       h += '<div style="display:flex;gap:8px;margin-top:12px">' + kpi('Ingresos', colones(n.ingresos), 'var(--verde-txt)') + kpi('Gastos', colones(-n.gastos), 'var(--rojo-txt)') + '</div>' +
@@ -870,6 +858,63 @@
       '<div class="opciones c3"><button class="op" id="r-pdf">PDF</button><button class="op" id="r-excel">Excel</button><button class="op" id="r-wa" style="background:var(--verde-bg);color:var(--verde-txt)">Imagen</button></div>';
     return h;
   }
+  function kpiR(l, v, c) { return '<div class="card pad" style="flex:1;min-width:0"><div class="nota" style="margin:0">' + l + '</div><div style="font-weight:800;font-size:20px;color:' + (c || 'inherit') + '">' + v + '</div></div>'; }
+  function filaPago(p) {
+    var est = p.estado === 'Pagado' ? 'verde' : p.estado === 'Pendiente' ? 'rojo' : '';
+    return '<a class="fila" style="text-decoration:none;color:inherit" href="#/cliente/' + encodeURIComponent(p.usuario) + '"><div style="width:44px;text-align:center;flex:0 0 auto"><b style="font-size:18px">' + Number(p.fecha.slice(8, 10)) + '</b><div class="nota" style="margin:0;text-transform:uppercase">' + MESES[Number(p.fecha.slice(5, 7)) - 1].slice(0, 3) + '</div></div>' +
+      '<span class="txt"><span class="t1">' + esc(p.usuario) + '</span><span class="t2">' + (p.tipo === 'Pago de deuda' ? 'Pago de deuda' : (p.dispositivos ? disp(p.dispositivos) + ' · ' : '') + plural(p.meses, 'mes', 'meses') + (p.regalia ? ' +' + p.regalia : '')) + '</span></span>' +
+      '<span style="text-align:right;flex:0 0 auto"><b>' + colones(p.monto) + '</b><br><span class="chip ' + est + '">' + esc(p.estado) + '</span></span></a>';
+  }
+  /** Usuarios que coinciden con la búsqueda (null = sin búsqueda). */
+  function usuariosBuscados() {
+    var q = (S.rep.buscar || '').trim(); if (!q) return null;
+    var m = {}; buscarClientes(S.datos.clientes, q).forEach(function (c) { m[c.usuario] = 1; });
+    var qn = q.toLowerCase(); (S.repBase ? S.repBase.cobros : []).forEach(function (c) { if (String(c.Usuario).toLowerCase().indexOf(qn) >= 0) m[c.Usuario] = 1; });
+    return m;
+  }
+  /** Reporte de un solo cliente en el periodo. */
+  function reporteCliente(u, rg) {
+    return reporte({ cobros: S.repBase.cobros.filter(function (c) { return c.Usuario === u; }), movimientos: [], clientes: [] }, configLogica(), rg.desde, rg.hasta);
+  }
+  function cuerpoReporte(d, rg) {
+    var R = S.rep, t = d.totales, h = '', sel = usuariosBuscados();
+    // Un cliente escogido: su propio reporte
+    if (R.cliente) {
+      var dc = reporteCliente(R.cliente, rg), c = cliente(R.cliente), pc = dc.porCliente[0] || { pagos: 0, meses: 0, total: 0, pendiente: 0 };
+      var debeHoy = c ? c.debe : pc.pendiente;
+      return '<div class="card pad" style="margin-top:12px;display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><b style="font-size:20px">' + esc(R.cliente) + '</b>' +
+        (c ? '<div class="nota" style="margin:2px 0 0">' + esc(c.nombre || '') + (c.vence ? ' · vence ' + fechaCorta(c.vence) : '') + ' · ' + esc(c.estado) + '</div>' : '') + '</div>' +
+        '<button class="btn chico sec" id="rcli-x">Quitar</button></div>' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' + kpiR('Pagó', colones(pc.total), 'var(--verde-txt)') + kpiR('Pagos', pc.pagos) + kpiR('Meses', pc.meses) + '</div>' +
+        (debeHoy ? '<div class="aviso" style="margin-top:8px">' + ico('alerta') + '<div style="flex:1"><b>Debe ' + colones(debeHoy) + '</b>Cobros pendientes</div><a class="btn chico" style="align-self:center" href="#/deuda/' + encodeURIComponent(R.cliente) + '">Registrar pago</a></div>' : '') +
+        '<div class="card" style="margin-top:10px">' + (dc.pagos.length ? dc.pagos.map(filaPago).join('') : '<div class="vacio">Sin pagos en ' + esc(rg.nombre) + '</div>') + '</div>' +
+        '<a class="btn sec" style="margin-top:10px" href="#/cliente/' + encodeURIComponent(R.cliente) + '">Ver ficha del cliente</a>';
+    }
+    if (R.tab === 'pagos') {
+      var pagos = sel ? d.pagos.filter(function (p) { return sel[p.usuario]; }) : d.pagos;
+      var cob = 0, pen = 0, n = 0; pagos.forEach(function (p) { if (p.estado === 'Pagado') { cob += p.monto; n++; } if (p.estado === 'Pendiente') pen += p.monto; });
+      h += '<div style="display:flex;gap:8px;margin-top:12px">' + kpiR('Cobrado', colones(cob), 'var(--verde-txt)') + kpiR('Pendiente', colones(pen), pen ? 'var(--rojo-txt)' : '') + kpiR('Cobros', n) + '</div>';
+      var formas = Object.keys(t.porForma).filter(function (k) { return k !== 'Sin dato'; });
+      if (formas.length && !sel) h += '<p class="nota">' + formas.map(function (k) { return esc(k) + ' ' + colones(t.porForma[k]); }).join(' · ') + '</p>';
+      h += '<div class="card" style="margin-top:10px">' + (pagos.length ? pagos.map(filaPago).join('') : '<div class="vacio">' + (sel ? 'Nada con esa búsqueda en ' : 'No hay cobros en ') + esc(rg.nombre) + '</div>') + '</div>';
+      return h;
+    }
+    var lista = d.porCliente.filter(function (c) { return !sel || sel[c.usuario]; });
+    if (sel && !lista.length) {
+      // Buscó a alguien que no pagó en el periodo: igual se puede abrir su reporte
+      var cands = Object.keys(sel).slice(0, 8);
+      return '<p class="nota">Nadie con esa búsqueda pagó en ' + esc(rg.nombre) + '.</p>' + (cands.length ? '<div class="card">' + cands.map(function (u) {
+        return '<button class="fila" data-rcli="' + esc(u) + '" style="width:100%;background:none;border:0;text-align:left;font:inherit;color:inherit"><span class="txt"><span class="t1">' + esc(u) + '</span><span class="t2">Ver su historial</span></span>' + ico('flecha') + '</button>';
+      }).join('') + '</div>' : '');
+    }
+    h += '<p class="nota">' + plural(lista.filter(function (c) { return c.pagos; }).length, 'cliente pagó', 'clientes pagaron') + ' en ' + esc(rg.nombre) + (sel ? ' (con esa búsqueda)' : ', de mayor a menor') + '. Toque uno para ver su detalle.</p>';
+    h += '<div class="card">' + (lista.length ? lista.map(function (c) {
+      return '<button class="fila" data-rcli="' + esc(c.usuario) + '" style="width:100%;background:none;border:0;text-align:left;font:inherit;color:inherit;cursor:pointer"><span class="txt"><span class="t1">' + esc(c.usuario) + '</span><span class="t2">' +
+        plural(c.pagos, 'pago', 'pagos') + ' · ' + plural(c.meses, 'mes', 'meses') + (c.ultimo ? ' · último ' + fechaCorta(c.ultimo) : '') + (c.pendiente ? ' · <span style="color:var(--rojo-txt)">debe ' + colones(c.pendiente) + '</span>' : '') + '</span></span>' +
+        '<b style="flex:0 0 auto">' + colones(c.total) + '</b></button>';
+    }).join('') : '<div class="vacio">Nadie pagó en ' + esc(rg.nombre) + '</div>') + '</div>';
+    return h;
+  }
   function cargarBaseReportes() {
     if (S.repCargando) return S.repCargando;
     S.repCargando = api('datosReporte').then(function (b) {
@@ -883,14 +928,14 @@
     var t = d.totales, n = d.negocio;
     var filas = tab === 'clientes' ? d.porCliente.filter(function (c) { return c.pagos; }).slice(0, 8).map(function (c) { return [c.usuario, plural(c.pagos, 'pago', 'pagos') + ' · ' + plural(c.meses, 'mes', 'meses'), colones(c.total), '']; })
       : tab === 'negocio' ? Object.keys(n.gastosPorTipo).map(function (k) { return [k, 'Gasto', colones(-n.gastosPorTipo[k]), '']; }).concat(n.repartos.map(function (r) { return ['Reparto 50/50', fechaCorta(r.fecha), colones(r.monto), '']; }))
-      : d.pagos.slice(0, 8).map(function (p) { return [p.usuario, fechaCorta(p.fecha) + ' · ' + plural(p.meses, 'mes', 'meses'), colones(p.monto), p.estado]; });
-    var extra = tab === 'pagos' ? Math.max(0, d.pagos.length - 8) : tab === 'clientes' ? Math.max(0, d.porCliente.filter(function (c) { return c.pagos; }).length - 8) : 0;
+      : d.pagos.slice(0, tab === 'cliente' ? 12 : 8).map(function (p) { return [p.usuario, fechaCorta(p.fecha) + ' · ' + plural(p.meses, 'mes', 'meses'), colones(p.monto), p.estado]; });
+    var extra = tab === 'cliente' ? Math.max(0, d.pagos.length - 12) : tab === 'pagos' ? Math.max(0, d.pagos.length - 8) : tab === 'clientes' ? Math.max(0, d.porCliente.filter(function (c) { return c.pagos; }).length - 8) : 0;
     var W = 1080, top = 600, rowH = 92, H = top + 90 + Math.max(1, filas.length) * rowH + (extra ? 60 : 0) + 120;
     var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
     var F = '-apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif', NAR = '#FF7A4D', AZ = '#0E1330', CARD = '#1A2250', T2 = '#C9CEEA', VERDE = '#5BD38A', ROJO = '#FF8A80';
     x.fillStyle = AZ; x.fillRect(0, 0, W, H);
     x.fillStyle = NAR; x.font = '700 26px ' + F; x.fillText('REPORTE IPTV', 72, 100);
-    x.fillStyle = '#fff'; x.font = '800 64px ' + F; x.fillText(nombre.charAt(0).toUpperCase() + nombre.slice(1), 72, 175, W - 144);
+    x.fillStyle = '#fff'; x.font = '800 64px ' + F; x.fillText(tab === 'cliente' ? nombre : nombre.charAt(0).toUpperCase() + nombre.slice(1), 72, 175, W - 144);
     x.fillStyle = T2; x.font = '400 26px ' + F; x.fillText(fechaCorta(d.desde < '2001' ? (d.pagos.length ? d.pagos[d.pagos.length - 1].fecha : d.hasta) : d.desde) + ' al ' + fechaCorta(d.hasta), 72, 218);
     var kp = function (bx, by, bw, l, v, c) {
       x.fillStyle = CARD; redondo(x, bx, by, bw, 130, 20); x.fill();
@@ -901,12 +946,20 @@
     kp(72, 250, bw3, 'Cobrado', colones(t.cobrado), VERDE);
     kp(72 + bw3 + 16, 250, bw3, 'Pendiente', colones(t.pendiente), t.pendiente ? ROJO : '#fff');
     kp(72 + (bw3 + 16) * 2, 250, bw3, 'Cobros', String(t.cobros));
-    kp(72, 396, bw3, 'Gastos', colones(-n.gastos), ROJO);
-    kp(72 + bw3 + 16, 396, bw3, 'Ganancia', colones(n.ganancia), n.ganancia >= 0 ? VERDE : ROJO);
-    kp(72 + (bw3 + 16) * 2, 396, bw3, 'Créditos usados', String(t.creditos));
+    if (tab === 'cliente') {
+      var meses = d.pagos.reduce(function (a, p) { return a + (p.estado === 'Pagado' ? p.meses : 0); }, 0);
+      var ult = d.pagos.filter(function (p) { return p.estado === 'Pagado'; })[0];
+      kp(72, 396, bw3, 'Meses pagados', String(meses));
+      kp(72 + bw3 + 16, 396, bw3, 'Último pago', ult ? fechaCorta(ult.fecha) : '—');
+      kp(72 + (bw3 + 16) * 2, 396, bw3, 'Créditos usados', String(t.creditos));
+    } else {
+      kp(72, 396, bw3, 'Gastos', colones(-n.gastos), ROJO);
+      kp(72 + bw3 + 16, 396, bw3, 'Ganancia', colones(n.ganancia), n.ganancia >= 0 ? VERDE : ROJO);
+      kp(72 + (bw3 + 16) * 2, 396, bw3, 'Créditos usados', String(t.creditos));
+    }
     x.fillStyle = T2; x.font = '700 24px ' + F;
     x.fillText(tab === 'clientes' ? 'CLIENTES QUE MÁS PAGARON' : tab === 'negocio' ? 'GASTOS Y REPARTOS' : 'PAGOS', 72, top + 20);
-    if (n.repartido) { x.textAlign = 'right'; x.fillStyle = NAR; x.fillText('Repartido: ' + colones(n.repartido / 2) + ' c/u', W - 72, top + 20); x.textAlign = 'left'; }
+    if (n.repartido && tab !== 'cliente') { x.textAlign = 'right'; x.fillStyle = NAR; x.fillText('Repartido: ' + colones(n.repartido / 2) + ' c/u', W - 72, top + 20); x.textAlign = 'left'; }
     x.fillStyle = CARD; redondo(x, 72, top + 44, W - 144, Math.max(1, filas.length) * rowH + 16, 22); x.fill();
     if (!filas.length) { x.fillStyle = T2; x.font = '400 28px ' + F; x.fillText('Sin movimientos en este periodo', 108, top + 44 + 60); }
     filas.forEach(function (f, i) {
@@ -1255,13 +1308,33 @@
     };
     if (ruta === 'finanzas' && !S.repBase && !DEMO) cargarBaseReportes();
     if (ruta === 'reportes') {
-      todos('[data-rtab]', function (x) { x.onclick = function () { S.rep.tab = x.dataset.rtab; render(); }; });
+      todos('[data-rtab]', function (x) { x.onclick = function () { S.rep.tab = x.dataset.rtab; if (S.rep.tab === 'negocio') S.rep.cliente = null; render(); }; });
+      var enlazarCuerpo = function () {
+        todos('[data-rcli]', function (x) { x.onclick = function () { S.rep.cliente = x.dataset.rcli; S.rep.tab = 'clientes'; render(); window.scrollTo(0, 0); }; });
+        if ($('rcli-x')) $('rcli-x').onclick = function () { S.rep.cliente = null; render(); };
+      };
+      enlazarCuerpo();
+      if ($('rbuscar')) $('rbuscar').oninput = function () {
+        S.rep.buscar = this.value; S.rep.cliente = null;
+        var rgx = rangoPeriodo(S.rep.periodo);
+        if (S.rep.datos) { $('rep-cuerpo').innerHTML = cuerpoReporte(S.rep.datos, rgx); enlazarCuerpo(); prepararImagen(); }
+      };
       todos('[data-rper]', function (x) { x.onclick = function () { S.rep.periodo = x.dataset.rper; render(); }; });
       if ($('rmes')) $('rmes').onchange = function () { if (this.value) { S.rep.periodo = this.value; render(); } };
       var Rd = S.rep && S.rep.datos, Rn = rangoPeriodo(S.rep.periodo).nombre;
       var nombreArch = 'Reporte-IPTV-' + Rn.replace(/\s+/g, '-') + '-' + S.rep.tab;
       var fileR = null;
-      if (Rd && $('r-wa')) dibujarReporte(Rd, Rn, S.rep.tab).then(function (b) { fileR = new File([b], nombreArch + '.png', { type: 'image/png' }); });
+      var prepararImagen = function () {
+        fileR = null; if (!Rd || !$('r-wa')) return;
+        var rgI = rangoPeriodo(S.rep.periodo), dI = Rd, nI = Rn, tabI = S.rep.tab, sel = usuariosBuscados();
+        if (S.rep.cliente) { dI = reporteCliente(S.rep.cliente, rgI); nI = S.rep.cliente + ' · ' + Rn; tabI = 'cliente'; }
+        else if (sel && tabI !== 'negocio') {
+          dI = reporte({ cobros: S.repBase.cobros.filter(function (c) { return sel[c.Usuario]; }), movimientos: [], clientes: [] }, configLogica(), rgI.desde, rgI.hasta);
+          tabI = tabI === 'clientes' ? 'clientes' : 'cliente';
+        }
+        dibujarReporte(dI, nI, tabI).then(function (b) { fileR = new File([b], nombreArch + '.png', { type: 'image/png' }); });
+      };
+      prepararImagen();
       if ($('r-wa')) $('r-wa').onclick = function () {
         if (fileR) compartirArchivo(fileR, 'Reporte IPTV', false);
         else abrirWhatsApp('', textoReporte(Rd, Rn));

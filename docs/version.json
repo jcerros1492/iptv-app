@@ -1,8 +1,8 @@
 {
-  "version": "2.5",
+  "version": "2.6",
   "fecha": "2026-11-22",
   "cambios": [
-    "Reportes al instante al cambiar de periodo",
-    "Reporte como imagen para WhatsApp"
+    "Reportes: buscador por nombre, usuario o teléfono",
+    "Reporte de un solo cliente"
   ]
 }

@@ -4,6 +4,14 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.6 · 22 nov 2026
+- Reportes (Pagos y Por cliente): buscador fijo por nombre, usuario o teléfono.
+- Al tocar un cliente se ve su reporte: cuánto pagó, pagos, meses, si debe (con botón para
+  registrar el pago) y la lista de sus pagos en el periodo. "Quitar" vuelve a la lista.
+- La imagen respeta lo que se está viendo (un cliente, una búsqueda o todo).
+- Incluye la 2.5.
+- Motor: no (si no instaló la 2.5, pegue el Codigo.gs de la 2.5).
+
 ## 2.5 · 22 nov 2026
 - Reportes: los datos se bajan una sola vez (al entrar a Finanzas) y cada cambio de periodo o
   pestaña es instantáneo.

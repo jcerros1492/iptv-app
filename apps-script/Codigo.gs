@@ -89,7 +89,7 @@ function verificarSesionPropia_(token) {
   var d = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(partes[1] + '==='.slice((partes[1].length + 3) % 4))).getDataAsString());
   var ahora = Math.floor(Date.now() / 1000);
   if (!(d.e > ahora)) throw new Error('Sesión vencida. Vuelva a entrar.');
-  var config = leerConfig(leerTabla_('Config'));
+  var config = configRapida_();
   var permitidos = [String(config.correo_jonathan).toLowerCase(), String(config.correo_fernando).toLowerCase()];
   if (permitidos.indexOf(d.c) < 0) throw new Error('Sesión vencida. Vuelva a entrar.');
   var corte = config.cerrar_sesiones_antes ? String(config.cerrar_sesiones_antes).slice(0, 10) : '';
@@ -100,6 +100,15 @@ function verificarSesionPropia_(token) {
   // Renovar sola si ya tiene más de 7 días
   if (ahora - d.i > 7 * 86400) SESION_NUEVA_ = crearSesion_(d.c);
   return d.c;
+}
+
+/** Config guardada 2 minutos en memoria de Google, para no leer la hoja en cada llamada. */
+function configRapida_() {
+  var cache = CacheService.getScriptCache(), g = cache.get('config');
+  if (g) return JSON.parse(g);
+  var c = leerConfig(leerTabla_('Config'));
+  try { cache.put('config', JSON.stringify(c), 120); } catch (e) { }
+  return c;
 }
 
 function verificarUsuario_(token) {
@@ -299,34 +308,53 @@ function agregarFila_(nombre, obj) {
   h.appendRow(fila);
 }
 
+/*
+ * Guarda todos los cambios de una vez: cada pestaña se lee una sola vez, se cambia en memoria
+ * y se escribe con pocas llamadas (antes era una llamada por cada celda, por eso tardaba).
+ */
 function guardarCambios_(cambios) {
+  var tablas = {};
+  var tabla = function (nombre) {
+    if (!tablas[nombre]) {
+      var h = hoja_(nombre), datos = h.getDataRange().getValues();
+      tablas[nombre] = { h: h, datos: datos, enc: datos[0], sucias: {}, nuevas: [] };
+    }
+    return tablas[nombre];
+  };
   cambios.forEach(function (c) {
     var fila = {};
     for (var k in c.fila) fila[k] = c.fila[k];
     if (c.contrasena) fila['Contraseña'] = cifrar_(c.contrasena);
+    var t = tabla(c.tabla);
     if (c.op === 'agregar') {
-      agregarFila_(c.tabla, fila);
+      t.nuevas.push(t.enc.map(function (e) { return aCelda_(fila[e], e); }));
     } else if (c.op === 'actualizar') {
-      actualizarFila_(c.tabla, c.clave, c.valor, fila);
+      var col = t.enc.indexOf(c.clave), hallada = false;
+      for (var i = 1; i < t.datos.length; i++) {
+        if (String(aTexto_(t.datos[i][col], c.clave)) === String(c.valor)) {
+          for (var k2 in fila) { var j = t.enc.indexOf(k2); if (j >= 0) t.datos[i][j] = aCelda_(fila[k2], k2); }
+          t.sucias[i] = true; hallada = true; break;
+        }
+      }
+      if (!hallada && c.tabla === 'Config') t.nuevas.push(t.enc.map(function (e) { return aCelda_(e === 'Clave' ? c.valor : e === 'Valor' ? fila.Valor : '', e); }));
     }
+  });
+  Object.keys(tablas).forEach(function (n) {
+    var t = tablas[n], ancho = t.enc.length;
+    // Filas cambiadas: se escriben en bloques seguidos
+    var filas = Object.keys(t.sucias).map(Number).sort(function (a, b) { return a - b; });
+    for (var x = 0; x < filas.length; ) {
+      var desde = filas[x], hasta = desde;
+      while (x + 1 < filas.length && filas[x + 1] === hasta + 1) { x++; hasta++; }
+      t.h.getRange(desde + 1, 1, hasta - desde + 1, ancho).setValues(t.datos.slice(desde, hasta + 1));
+      x++;
+    }
+    if (t.nuevas.length) t.h.getRange(t.h.getLastRow() + 1, 1, t.nuevas.length, ancho).setValues(t.nuevas);
   });
 }
 
 function actualizarFila_(nombre, clave, valor, obj) {
-  var h = hoja_(nombre);
-  var datos = h.getDataRange().getValues();
-  var enc = datos[0];
-  var col = enc.indexOf(clave);
-  for (var i = 1; i < datos.length; i++) {
-    if (String(aTexto_(datos[i][col], clave)) === String(valor)) {
-      for (var k in obj) {
-        var j = enc.indexOf(k);
-        if (j >= 0) h.getRange(i + 1, j + 1).setValue(aCelda_(obj[k], k));
-      }
-      return;
-    }
-  }
-  if (nombre === 'Config') agregarFila_('Config', { Clave: valor, Valor: obj.Valor, Nota: '' });
+  guardarCambios_([{ tabla: nombre, op: 'actualizar', clave: clave, valor: valor, fila: obj }]);
 }
 
 /* ============ Tipo de cambio guardado ============ */

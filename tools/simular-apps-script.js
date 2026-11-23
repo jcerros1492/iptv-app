@@ -14,7 +14,9 @@ const sheets = {};
 for (const n in HEAD) sheets[n] = [HEAD[n]].concat(src[n].map(r => HEAD[n].map(h => (fechaCols.has(h) && r[h]) ? new Date(r[h] + 'T12:00:00') : (r[h] === undefined ? '' : r[h]))));
 function Sheet(n){ const d = sheets[n]; return {
   getDataRange:()=>({getValues:()=>d.map(r=>r.slice())}), getLastColumn:()=>d[0].length,
-  getRange:(r,c,nr,nc)=>({getValues:()=>[d[r-1].slice(c-1,c-1+(nc||1))], setValue:v=>{d[r-1][c-1]=v;}}),
+  getLastRow:()=>d.length,
+  getRange:(r,c,nr,nc)=>({getValues:()=>[d[r-1].slice(c-1,c-1+(nc||1))], setValue:v=>{d[r-1][c-1]=v;},
+    setValues:vals=>{ vals.forEach((row,i)=>{ while(d.length<r+i) d.push(new Array(d[0].length).fill('')); row.forEach((v,j)=>{ d[r-1+i][c-1+j]=v; }); }); }}),
   appendRow:row=>d.push(row)};}
 let props = {CLIENT_ID:'cid'};
 const fakeHtml = '<tr><td>Bancos públicos</td><td>Banco de Costa Rica </td><td>446,00</td><td>460,00</td><td>14,00</td></tr>';

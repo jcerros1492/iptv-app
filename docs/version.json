@@ -1,7 +1,9 @@
 {
-  "version": "3.3",
+  "version": "3.4",
   "fecha": "2026-11-23",
   "cambios": [
-    "Marcar como depositado lo que se pasó al sobre"
+    "Guardar es más rápido",
+    "Sobre con céntimos",
+    "Aviso de actualización aunque no salga de la app"
   ]
 }

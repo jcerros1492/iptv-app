@@ -4,6 +4,13 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.4 · 23 nov 2026
+- Guardar cobros, abonos, depósitos y gastos es más rápido: el motor escribe todo de una sola
+  vez en vez de celda por celda, y no vuelve a leer la configuración en cada llamada.
+- Finanzas, Movimientos y Depositar muestran céntimos como el banco (₡192.762,92).
+- El aviso de versión nueva se revisa también cada 2 minutos con la app abierta.
+- Motor: SÍ → copiar Codigo.gs a Apps Script y hacer Nueva versión.
+
 ## 3.3 · 23 nov 2026
 - Nuevo: Depositar en el sobre. En Finanzas, tocar "₡X sin depositar ›" (o la alerta naranja)
   muestra los cobros que no están en el sobre; se marcan y "Ya lo pasé al sobre".

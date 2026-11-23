@@ -46,7 +46,7 @@ with sync_playwright() as p:
     pg.click('#n-guardar'); pg.wait_for_timeout(900)
     assert 'ClientePrueba' in pg.content(), 'no abrió cobro del nuevo'
     pg.goto('http://localhost:8765/index.html#/finanzas'); pg.wait_for_timeout(500); pg.screenshot(path=OUT+'12-finanzas.png', full_page=True)
-    t=pg.inner_text('#app'); assert '₡194.763' in t, 'sobre no subió: '+t[:300]
+    t=pg.inner_text('#app'); assert '₡194.762,92' in t, 'sobre no subió: '+t[:300]
     pg.goto('http://localhost:8765/index.html#/ajustes'); pg.wait_for_timeout(400); pg.screenshot(path=OUT+'13-ajustes.png')
     pg.goto('http://localhost:8765/index.html#/inicio'); pg.wait_for_timeout(400); pg.screenshot(path=OUT+'14-inicio-despues.png', full_page=True)
     # computadora

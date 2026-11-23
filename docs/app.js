@@ -46,6 +46,13 @@
    * Lee un monto escrito por la persona: acepta 9095,45 · 9095.45 · 9.095,45 · 9,095.45 · 176762.92 · ₡20.880
    * Regla: el último punto o coma seguido de 1 o 2 cifras es decimal; los demás son de miles.
    */
+  /** Colones con céntimos, como los muestra el banco: ₡192.762,92 */
+  function colonesDec(n) {
+    n = Math.round(numero(n) * 100) / 100;
+    var a = Math.abs(n), ent = Math.floor(a), dec = Math.round((a - ent) * 100);
+    if (dec === 100) { ent++; dec = 0; }
+    return (n < 0 ? '−' : '') + '₡' + String(ent).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + (dec < 10 ? '0' : '') + dec;
+  }
   /** Monto para escribir en un campo: ₡20.880 o ₡9.095,45 (con céntimos si los tiene). */
   function montoCampo(n) {
     n = Math.round(numero(n) * 100) / 100;
@@ -787,28 +794,28 @@
       '<div class="tiles" style="grid-template-columns:repeat(2,1fr)">' +
       '<div class="tile" style="padding:16px"><span>Créditos disponibles</span><b style="font-size:44px;line-height:1.05;margin-top:4px;color:' + (r.creditos < 30 ? 'var(--rojo-txt)' : 'var(--texto)') + '">' + r.creditos + '</b>' +
         '<span style="font-size:12px;margin-top:4px">' + (uso30 ? uso30 + ' usados en 30 días' + (alcanza !== null ? ' · alcanzan ~' + plural(alcanza, 'mes', 'meses') : '') : '') + '</span></div>' +
-      '<div class="tile" style="padding:16px"><span>En el sobre BCR</span><b style="font-size:26px;line-height:1.15;margin-top:10px">' + colones(r.sobreEnBanco) + '</b>' +
-        (r.sinDepositar ? '<a href="#/depositar" style="font-size:12px;margin-top:4px;color:var(--naranja-txt);font-weight:600">' + colones(r.sinDepositar) + ' sin depositar ›</a>' : '<span style="font-size:12px;margin-top:4px">Todo depositado</span>') + '</div></div>' +
+      '<div class="tile" style="padding:16px"><span>En el sobre BCR</span><b style="font-size:26px;line-height:1.15;margin-top:10px">' + colonesDec(r.sobreEnBanco) + '</b>' +
+        (r.sinDepositar ? '<a href="#/depositar" style="font-size:12px;margin-top:4px;color:var(--naranja-txt);font-weight:600">' + colonesDec(r.sinDepositar) + ' sin depositar ›</a>' : '<span style="font-size:12px;margin-top:4px">Todo depositado</span>') + '</div></div>' +
       (r.creditos < 30 ? '<div class="aviso" style="margin-top:10px">' + ico('alerta') + '<div><b>Quedan pocos créditos</b>Conviene comprar más al proveedor.</div></div>' : '') +
       '<details class="card pad" style="margin-top:10px"' + (ctrl && !todoCuadra ? ' open' : '') + '><summary style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none">' +
         '<b style="font-size:14px">Cuadre con el banco y el panel</b>' +
         (ctrl ? '<span class="chip ' + (todoCuadra ? 'verde' : 'naranja') + '">' + (todoCuadra ? 'Cuadra ✓' : 'Revisar') + '</span>' : '<span class="chip">Sin revisar</span>') + '</summary>' +
         '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">' +
         (ctrl ? '<div class="nota" style="margin:0">Última revisión: ' + fechaCorta(ctrl.fecha) + '</div>' +
-          '<div class="dato"><span class="l">Sobre según la app</span><span class="v">' + colones(r.sobreEnBanco) + '</span></div>' +
-          '<div class="dato"><span class="l">Sobre real en el banco</span><span class="v">' + colones(ctrl.sobreReal) + '</span></div>' +
-          '<div class="dato"><span class="l">Diferencia</span><span class="v" style="color:' + (cuadraS ? 'var(--verde-txt)' : 'var(--naranja-txt)') + '">' + colones(ctrl.difSobre) + '</span></div>' +
+          '<div class="dato"><span class="l">Sobre según la app</span><span class="v">' + colonesDec(r.sobreEnBanco) + '</span></div>' +
+          '<div class="dato"><span class="l">Sobre real en el banco</span><span class="v">' + colonesDec(ctrl.sobreReal) + '</span></div>' +
+          '<div class="dato"><span class="l">Diferencia</span><span class="v" style="color:' + (cuadraS ? 'var(--verde-txt)' : 'var(--naranja-txt)') + '">' + colonesDec(ctrl.difSobre) + '</span></div>' +
           '<div class="dato"><span class="l">Créditos según la app</span><span class="v">' + r.creditos + '</span></div>' +
           '<div class="dato"><span class="l">Créditos en el panel</span><span class="v">' + ctrl.creditosPanel + (cuadraC ? '' : ' <small style="color:var(--naranja-txt)">(' + (ctrl.difCreditos > 0 ? '+' : '') + ctrl.difCreditos + ')</small>') + '</span></div>' : '') +
         '<button class="btn sec" id="control">Actualizar con el banco y el panel</button></div></details>' +
       '<div class="card pad" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"><b style="font-size:14px;margin-bottom:4px">Para repartir (50/50)</b>' +
-      '<div class="dato"><span class="l">Hay en el sobre</span><span class="v">' + colones(r.sobre) + '</span></div>' +
-      '<div class="dato"><span class="l">Reserva para créditos</span><span class="v" style="color:var(--naranja-txt);white-space:nowrap">' + colones(-r.reserva) + '</span></div>' +
-      '<div class="nota" style="margin-top:-4px">' + r.usadosDesdeCompra + ' créditos usados desde la última compra × $' + S.datos.config.costo_credito + ' × cambio BCR ' + colones(r.tipoCambio) + '</div>' +
-      '<div class="dato"><span class="l"><b style="color:var(--texto)">Disponible para repartir</b></span><span class="v" style="color:var(--verde-txt)">' + colones(r.disponible) + '</span></div>' +
-      '<div class="nota">' + colones(r.disponible / 2) + ' para cada uno. Los retiros con aprobación llegan en la etapa 2.</div></div>' +
-      '<div class="tiles" style="grid-template-columns:repeat(2,1fr);margin-top:10px"><div class="tile"><span>Pendiente por cobrar</span><b style="font-size:18px;color:var(--naranja-txt)">' + colones(r.pendiente) + '</b></div>' +
-      '<div class="tile"><span>Incobrable</span><b style="font-size:18px;color:var(--suave)">' + colones(r.incobrable) + '</b></div></div>' +
+      '<div class="dato"><span class="l">Hay en el sobre</span><span class="v">' + colonesDec(r.sobre) + '</span></div>' +
+      '<div class="dato"><span class="l">Reserva para créditos</span><span class="v" style="color:var(--naranja-txt);white-space:nowrap">' + colonesDec(-r.reserva) + '</span></div>' +
+      '<div class="nota" style="margin-top:-4px">' + r.usadosDesdeCompra + ' créditos usados desde la última compra × $' + S.datos.config.costo_credito + ' × cambio BCR ' + colonesDec(r.tipoCambio) + '</div>' +
+      '<div class="dato"><span class="l"><b style="color:var(--texto)">Disponible para repartir</b></span><span class="v" style="color:var(--verde-txt)">' + colonesDec(r.disponible) + '</span></div>' +
+      '<div class="nota">' + colonesDec(r.disponible / 2) + ' para cada uno. Los retiros con aprobación llegan en la etapa 2.</div></div>' +
+      '<div class="tiles" style="grid-template-columns:repeat(2,1fr);margin-top:10px"><div class="tile"><span>Pendiente por cobrar</span><b style="font-size:18px;color:var(--naranja-txt)">' + colonesDec(r.pendiente) + '</b></div>' +
+      '<div class="tile"><span>Incobrable</span><b style="font-size:18px;color:var(--suave)">' + colonesDec(r.incobrable) + '</b></div></div>' +
       '<div class="etq" style="display:flex;justify-content:space-between;align-items:center">Movimientos del sobre<a href="#/movimientos" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--texto);font-weight:600">Ver todos ›</a></div>' +
       '<div class="card">' + movimientosSobre(S.datos.cobros, S.datos.movimientos).slice(0, 12).map(filaMov).join('') + '</div>' +
       '<p class="nota">Entradas en verde (cobros y aportes) y salidas en rojo (gastos, créditos y repartos).</p>';
@@ -832,7 +839,7 @@
     var pos = m.monto >= 0;
     var tag = m.usuario ? 'a' : 'div';
     return '<' + tag + ' class="fila"' + (m.usuario ? ' href="#/cliente/' + encodeURIComponent(m.usuario) + '" style="text-decoration:none;color:inherit"' : '') + '><span class="txt"><span class="t1">' + esc(m.titulo) + '</span><span class="t2">' + fechaCorta(m.fecha) + (m.detalle ? ' · ' + esc(m.detalle) : '') + '</span></span>' +
-      '<b style="font-size:15px;white-space:nowrap;color:' + (pos ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (pos ? '+' : '−') + colones(Math.abs(m.monto)) + '</b></' + tag + '>';
+      '<b style="font-size:15px;white-space:nowrap;color:' + (pos ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (pos ? '+' : '−') + colonesDec(Math.abs(m.monto)) + '</b></' + tag + '>';
   }
   /* --- Todos los movimientos --- */
   function pMovimientos() {
@@ -849,9 +856,9 @@
       '<label class="filtro' + (/^\d{4}-\d{2}$/.test(M.periodo) ? ' sel' : '') + '" style="position:relative;display:inline-flex;align-items:center">' + (/^\d{4}-\d{2}$/.test(M.periodo) ? esc(rg.nombre) : 'Escoger mes…') +
       '<input type="month" id="mmes" style="position:absolute;inset:0;opacity:0"></label></div>' +
       '<div style="display:flex;gap:8px;margin-top:12px">' +
-      '<button class="card pad" data-mfil="entradas" style="flex:1;text-align:left;font:inherit;cursor:pointer;' + (M.filtro === 'entradas' ? 'border:2px solid var(--texto)' : '') + '"><div class="nota" style="margin:0">Entradas</div><b style="font-size:19px;color:var(--verde-txt)">+' + colones(entradas) + '</b></button>' +
-      '<button class="card pad" data-mfil="salidas" style="flex:1;text-align:left;font:inherit;cursor:pointer;' + (M.filtro === 'salidas' ? 'border:2px solid var(--texto)' : '') + '"><div class="nota" style="margin:0">Salidas</div><b style="font-size:19px;color:var(--rojo-txt)">−' + colones(-salidas) + '</b></button></div>' +
-      '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>Diferencia en ' + esc(rg.nombre) + '</span><b style="font-size:18px;color:' + (entradas + salidas >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (entradas + salidas >= 0 ? '+' : '−') + colones(Math.abs(entradas + salidas)) + '</b></div>' +
+      '<button class="card pad" data-mfil="entradas" style="flex:1;text-align:left;font:inherit;cursor:pointer;' + (M.filtro === 'entradas' ? 'border:2px solid var(--texto)' : '') + '"><div class="nota" style="margin:0">Entradas</div><b style="font-size:19px;color:var(--verde-txt)">+' + colonesDec(entradas) + '</b></button>' +
+      '<button class="card pad" data-mfil="salidas" style="flex:1;text-align:left;font:inherit;cursor:pointer;' + (M.filtro === 'salidas' ? 'border:2px solid var(--texto)' : '') + '"><div class="nota" style="margin:0">Salidas</div><b style="font-size:19px;color:var(--rojo-txt)">−' + colonesDec(-salidas) + '</b></button></div>' +
+      '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>Diferencia en ' + esc(rg.nombre) + '</span><b style="font-size:18px;color:' + (entradas + salidas >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (entradas + salidas >= 0 ? '+' : '−') + colonesDec(Math.abs(entradas + salidas)) + '</b></div>' +
       (M.filtro !== 'todos' ? '<p class="nota">Mostrando solo ' + M.filtro + '. <a href="#" id="mfil-x" style="color:var(--texto)">Ver todo</a></p>' : '') +
       '<div class="card" style="margin-top:10px">' + (lista.length ? lista.map(filaMov).join('') : '<div class="vacio">Sin movimientos en ' + esc(rg.nombre) + '</div>') + '</div>';
   }
@@ -870,9 +877,9 @@
         return '<label class="dato" style="cursor:pointer"><span class="l" style="display:flex;align-items:center;gap:12px">' +
           '<input type="checkbox" data-dep="' + esc(c.ID) + '"' + (S.dep.ids.indexOf(c.ID) >= 0 ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--texto)">' +
           '<span>' + esc(c.Usuario) + '<br><small>' + fechaCorta(c.Fecha) + ' · ' + esc(c.Tipo || '') + (c['Forma de pago'] ? ' · ' + esc(c['Forma de pago']) : '') + (c['Cobró'] ? ' · ' + esc(c['Cobró']) : '') + '</small></span></span>' +
-          '<span class="v">' + colones(numero(c.Monto)) + '</span></label>';
+          '<span class="v">' + colonesDec(numero(c.Monto)) + '</span></label>';
       }).join('') +
-      '<div class="dato"><span class="l"><b>A pasar al sobre</b></span><span class="v"><b>' + colones(total) + '</b></span></div></div>' +
+      '<div class="dato"><span class="l"><b>A pasar al sobre</b></span><span class="v"><b>' + colonesDec(total) + '</b></span></div></div>' +
       '<button class="btn" id="dep-ok" style="margin-top:14px"' + (S.dep.ids.length ? '' : ' disabled') + '>Ya lo pasé al sobre</button>' +
       '<p class="nota">Al confirmar, "En el sobre BCR" sube ese monto y deja de salir como "sin depositar", para que cuadre con el saldo real del banco.</p>';
   }
@@ -1644,4 +1651,6 @@
   render();
   avisarSiSeActualizo();
   revisarVersion();
+  // También revisar cada 2 minutos mientras la app está abierta y a la vista
+  setInterval(function () { if (document.visibilityState === 'visible') revisarVersion(); }, 120000);
 })();

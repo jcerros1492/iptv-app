@@ -1,2 +1,2 @@
 /* Número de versión de la app. Se cambia en cada actualización. */
-self.APP_VERSION = '3.2';
+self.APP_VERSION = '3.3';

@@ -1,7 +1,7 @@
 {
-  "version": "3.2",
+  "version": "3.3",
   "fecha": "2026-11-23",
   "cambios": [
-    "El separador de miles aparece mientras escribe el monto"
+    "Marcar como depositado lo que se pasó al sobre"
   ]
 }

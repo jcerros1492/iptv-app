@@ -120,7 +120,7 @@
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
             }
-            var fn = { guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
+            var fn = { depositar: accionDepositar, guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
             if (!fn) throw new Error('Acción desconocida');
             r = fn(db, config, datos, hoy, correo, tc);
             aplicarCambiosEnMemoria(db, r.cambios); guardarDemo();
@@ -440,7 +440,7 @@
     return barra('Alertas', '#/inicio') + '<p class="nota" style="margin:0 0 10px">Cosas que revisar en el negocio</p>' +
       (a.length ? '<div class="card">' + a.map(function (x) {
         var href = x.usuario ? ((x.tipo === 'Vencido' || x.tipo === 'Por vencer') ? '#/mensaje/' : x.tipo === 'Cobro' ? '#/deuda/' : '#/cliente/') + encodeURIComponent(x.usuario) :
-          x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : (x.tipo === 'Créditos' || x.tipo === 'Depósito') ? '#/finanzas' : '#/inicio';
+          x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : x.tipo === 'Depósito' ? '#/depositar' : x.tipo === 'Créditos' ? '#/finanzas' : '#/inicio';
         return '<a class="fila" href="' + href + '"><span class="punto ' + x.nivel + '"></span><span class="txt"><span class="t2" style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;font-size:11px">' +
           esc(x.tipo) + '</span><span class="t1">' + esc(x.titulo) + '</span><span class="t2">' + esc(x.detalle) + '</span></span></a>';
       }).join('') + '</div>' : '<div class="card"><div class="vacio">Todo en orden. No hay alertas.</div></div>');
@@ -788,7 +788,7 @@
       '<div class="tile" style="padding:16px"><span>Créditos disponibles</span><b style="font-size:44px;line-height:1.05;margin-top:4px;color:' + (r.creditos < 30 ? 'var(--rojo-txt)' : 'var(--texto)') + '">' + r.creditos + '</b>' +
         '<span style="font-size:12px;margin-top:4px">' + (uso30 ? uso30 + ' usados en 30 días' + (alcanza !== null ? ' · alcanzan ~' + plural(alcanza, 'mes', 'meses') : '') : '') + '</span></div>' +
       '<div class="tile" style="padding:16px"><span>En el sobre BCR</span><b style="font-size:26px;line-height:1.15;margin-top:10px">' + colones(r.sobreEnBanco) + '</b>' +
-        '<span style="font-size:12px;margin-top:4px">' + (r.sinDepositar ? colones(r.sinDepositar) + ' sin depositar' : 'Todo depositado') + '</span></div></div>' +
+        (r.sinDepositar ? '<a href="#/depositar" style="font-size:12px;margin-top:4px;color:var(--naranja-txt);font-weight:600">' + colones(r.sinDepositar) + ' sin depositar ›</a>' : '<span style="font-size:12px;margin-top:4px">Todo depositado</span>') + '</div></div>' +
       (r.creditos < 30 ? '<div class="aviso" style="margin-top:10px">' + ico('alerta') + '<div><b>Quedan pocos créditos</b>Conviene comprar más al proveedor.</div></div>' : '') +
       '<details class="card pad" style="margin-top:10px"' + (ctrl && !todoCuadra ? ' open' : '') + '><summary style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none">' +
         '<b style="font-size:14px">Cuadre con el banco y el panel</b>' +
@@ -854,6 +854,27 @@
       '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>Diferencia en ' + esc(rg.nombre) + '</span><b style="font-size:18px;color:' + (entradas + salidas >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (entradas + salidas >= 0 ? '+' : '−') + colones(Math.abs(entradas + salidas)) + '</b></div>' +
       (M.filtro !== 'todos' ? '<p class="nota">Mostrando solo ' + M.filtro + '. <a href="#" id="mfil-x" style="color:var(--texto)">Ver todo</a></p>' : '') +
       '<div class="card" style="margin-top:10px">' + (lista.length ? lista.map(filaMov).join('') : '<div class="vacio">Sin movimientos en ' + esc(rg.nombre) + '</div>') + '</div>';
+  }
+
+  /* --- Pasar al sobre lo cobrado que no se ha depositado --- */
+  function pDepositar() {
+    var pend = S.datos.cobros.filter(function (c) { return c.Estado === 'Pagado' && c['En sobre'] === 'No'; })
+      .sort(function (a, b) { return a.Fecha < b.Fecha ? -1 : 1; });
+    if (!S.dep) S.dep = { ids: pend.map(function (c) { return c.ID; }) };
+    S.dep.ids = S.dep.ids.filter(function (id) { return pend.some(function (c) { return c.ID === id; }); });
+    var total = pend.filter(function (c) { return S.dep.ids.indexOf(c.ID) >= 0; }).reduce(function (t, c) { return t + numero(c.Monto); }, 0);
+    if (!pend.length) return barra('Depositar en el sobre', '#/finanzas') + '<div class="card pad"><div class="vacio">✓ Todo lo cobrado ya está en el sobre.</div></div>';
+    return barra('Depositar en el sobre', '#/finanzas') +
+      '<p class="nota" style="margin:0 0 10px">Cobros que todavía no están en el sobre del BCR. Cuando los pase en el banco, márquelos aquí.</p>' +
+      '<div class="card">' + pend.map(function (c) {
+        return '<label class="dato" style="cursor:pointer"><span class="l" style="display:flex;align-items:center;gap:12px">' +
+          '<input type="checkbox" data-dep="' + esc(c.ID) + '"' + (S.dep.ids.indexOf(c.ID) >= 0 ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--texto)">' +
+          '<span>' + esc(c.Usuario) + '<br><small>' + fechaCorta(c.Fecha) + ' · ' + esc(c.Tipo || '') + (c['Forma de pago'] ? ' · ' + esc(c['Forma de pago']) : '') + (c['Cobró'] ? ' · ' + esc(c['Cobró']) : '') + '</small></span></span>' +
+          '<span class="v">' + colones(numero(c.Monto)) + '</span></label>';
+      }).join('') +
+      '<div class="dato"><span class="l"><b>A pasar al sobre</b></span><span class="v"><b>' + colones(total) + '</b></span></div></div>' +
+      '<button class="btn" id="dep-ok" style="margin-top:14px"' + (S.dep.ids.length ? '' : ' disabled') + '>Ya lo pasé al sobre</button>' +
+      '<p class="nota">Al confirmar, "En el sobre BCR" sube ese monto y deja de salir como "sin depositar", para que cuadre con el saldo real del banco.</p>';
   }
 
   /* --- Registrar gasto --- */
@@ -1184,7 +1205,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, depositar: { tab: 'finanzas', fn: pDepositar }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -1421,6 +1442,19 @@
       x.addEventListener('blur', function () { var n = leerMonto(x.value); if (x.value.trim() !== '') x.value = montoCampo(n); });
       x.addEventListener('focus', function () { setTimeout(function () { try { x.select(); } catch (e) { } }, 0); });
     });
+    if (ruta === 'depositar' && $('dep-ok')) {
+      todos('[data-dep]', function (x) { x.onchange = function () {
+        var i = S.dep.ids.indexOf(x.dataset.dep);
+        if (x.checked && i < 0) S.dep.ids.push(x.dataset.dep); if (!x.checked && i >= 0) S.dep.ids.splice(i, 1); render();
+      }; });
+      $('dep-ok').onclick = function () {
+        var tot = S.datos.cobros.filter(function (c) { return S.dep.ids.indexOf(c.ID) >= 0; }).reduce(function (t, c) { return t + numero(c.Monto); }, 0);
+        if (!window.confirm('¿Confirma que ya pasó ' + colones(tot) + ' al sobre del BCR?')) return;
+        guardando(this, api('depositar', { ids: S.dep.ids })).then(function (r) {
+          return refrescar().then(function () { S.dep = null; toast('✓ ' + colones(r.total) + ' pasados al sobre'); ir('#/finanzas'); });
+        });
+      };
+    }
     if (ruta === 'gasto') {
       var leer = function () { S.gasto.monto = $('g-monto').value === '' ? null : leerMonto($('g-monto').value); S.gasto.fecha = $('g-fecha').value || S.datos.hoy; if ($('g-desc')) S.gasto.descripcion = $('g-desc').value; };
       todos('[data-gtipo]', function (x) { x.onclick = function () { leer(); S.gasto.tipo = x.dataset.gtipo; S.gasto.monto = null; render(); }; });

@@ -324,7 +324,7 @@ function alertas(db, config, hoy, lista, tipoCambio) {
   var r = resumen(db, config);
   if (r.sinDepositar > 0) {
     out.push({ tipo: 'Depósito', nivel: 'naranja', titulo: colones(r.sinDepositar) + ' sin depositar en el sobre',
-      detalle: 'Cobros marcados como "no está en el sobre"' });
+      detalle: 'Toque cuando lo pase al sobre del BCR' });
   }
   if (r.control && r.control.difCreditos !== 0) {
     out.push({ tipo: 'Créditos', nivel: 'naranja',
@@ -570,6 +570,22 @@ function accionGuardarGasto(db, config, p, hoy, correo) {
   return { resultado: resultado, cambios: cambios };
 }
 
+/** Marcar cobros "sin depositar" como ya pasados al sobre del BCR. p.ids = cuáles (vacío = todos). */
+function accionDepositar(db, config, p, hoy, correo) {
+  var lista = db.cobros.filter(function (c) {
+    return c.Estado === 'Pagado' && c['En sobre'] === 'No' && (!p.ids || !p.ids.length || p.ids.indexOf(c.ID) >= 0);
+  });
+  if (!lista.length) throw new Error('No hay cobros pendientes de depositar.');
+  var socio = nombreSocio(config, correo), total = 0;
+  var cambios = lista.map(function (c) {
+    total += numero(c.Monto);
+    return { tabla: 'Cobros', op: 'actualizar', clave: 'ID', valor: c.ID,
+      fila: { 'En sobre': 'Sí', Nota: [c.Nota, 'Depositado ' + fechaCorta(p.fecha || hoy) + ' (' + socio + ')'].filter(Boolean).join(' · ') } };
+  });
+  cambios.push({ tabla: 'Accesos', op: 'agregar', fila: { Fecha: hoy, Usuario: socio, 'Acción': 'Depósito al sobre', Detalle: lista.length + ' cobro(s) · ' + colones(total) } });
+  return { resultado: { ok: true, total: total, cantidad: lista.length }, cambios: cambios };
+}
+
 function accionGuardarControl(db, config, p, hoy, correo) {
   return { resultado: { ok: true }, cambios: [
     { tabla: 'Controles', op: 'agregar', fila: { Fecha: hoy, 'Sobre real': numero(p.sobreReal), 'Créditos panel': numero(p.creditosPanel), 'Registró': nombreSocio(config, correo) } }
@@ -705,7 +721,7 @@ function aplicarCambiosEnMemoria(db, cambios) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { reporte: reporte, accionGuardarGasto: accionGuardarGasto, textoAdobe: textoAdobe,
+  module.exports = { reporte: reporte, accionDepositar: accionDepositar, accionGuardarGasto: accionGuardarGasto, textoAdobe: textoAdobe,
     sumarMeses: sumarMeses, sumarDias: sumarDias, diasEntre: diasEntre, fechaCorta: fechaCorta,
     redondear: redondear, colones: colones, numero: numero, leerConfig: leerConfig, CONFIG_POR_DEFECTO: CONFIG_POR_DEFECTO,
     calcularCobro: calcularCobro, evaluarPago: evaluarPago, resumen: resumen, alertas: alertas,

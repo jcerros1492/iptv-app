@@ -4,6 +4,12 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.3 · 23 nov 2026
+- Nuevo: Depositar en el sobre. En Finanzas, tocar "₡X sin depositar ›" (o la alerta naranja)
+  muestra los cobros que no están en el sobre; se marcan y "Ya lo pasé al sobre".
+  "En el sobre BCR" sube ese monto y la alerta desaparece. Queda anotado quién y cuándo.
+- Motor: SÍ → copiar Codigo.gs y Logica.gs a Apps Script y hacer Nueva versión.
+
 ## 3.2 · 23 nov 2026
 - Los montos se van formateando mientras se escriben: ₡1 → ₡10 → ₡100 → ₡1.000 → ₡10.000.
   La coma del teclado es para céntimos (₡9.095,45).

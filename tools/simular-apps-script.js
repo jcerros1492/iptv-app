@@ -106,5 +106,13 @@ var cobJ = post('pagarDeuda',{usuario:'JCerros14', monto: 1000, forma:'SINPE', e
 var sd0 = cobJ.estado.resumen.sinDepositar, sb0 = cobJ.estado.resumen.sobreEnBanco;
 r = post('depositar',{});
 chk('depositar deja todo en el sobre', r.ok && r.estado.resumen.sinDepositar === 0 && Math.abs(r.estado.resumen.sobreEnBanco - sb0 - sd0) < 0.01 && sd0 >= 1000);
+// Reparto con aprobación
+var dis0 = post('estado',{}).datos.resumen.disponible;
+r = post('reparto',{accion:'proponer', monto: 20000, nota:'prueba'});
+chk('proponer reparto', r.ok && r.estado.config.reparto && r.estado.config.reparto.monto === 20000 && r.estado.alertas.some(a=>a.tipo==='Reparto'));
+r = post('reparto',{accion:'aprobar'}); chk('el mismo socio no puede aprobar', !r.ok);
+r = post('reparto',{accion:'aprobar'}, 'fval85@gmail.com');
+chk('el otro socio aprueba y baja el disponible', r.ok && !r.estado.config.reparto && Math.abs(dis0 - r.estado.resumen.disponible - 20000) < 1);
+r = post('reparto',{accion:'proponer', monto: 99999999}); chk('no deja repartir más de lo disponible', !r.ok);
 console.log(fallas? fallas+' con error':'Todo bien');
 process.exit(fallas?1:0);

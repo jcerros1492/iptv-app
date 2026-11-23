@@ -1,9 +1,7 @@
 {
-  "version": "3.4",
+  "version": "3.5",
   "fecha": "2026-11-23",
   "cambios": [
-    "Guardar es más rápido",
-    "Sobre con céntimos",
-    "Aviso de actualización aunque no salga de la app"
+    "Reparto 50/50: uno propone y el otro aprueba"
   ]
 }

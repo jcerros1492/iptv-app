@@ -162,6 +162,19 @@ function ejecutar_(accion, datos, correo) {
       return conCandado_(function (db, config) { return accionGuardarCliente(db, config, datos, hoy, correo); });
     case 'pagarDeuda':
       return conCandado_(function (db, config) { return accionPagarDeuda(db, config, datos, hoy, correo); });
+    case 'reparto': {
+      var resR = conCandado_(function (db, config) { return accionReparto(db, config, datos, hoy, correo); });
+      // Avisar al otro socio
+      try {
+        var cfgR = leerConfig(leerTabla_('Config')), yo = nombreSocio(cfgR, correo);
+        var otro = yo === 'Jonathan' ? cfgR.correo_fernando : cfgR.correo_jonathan;
+        var txt = datos.accion === 'proponer' ? yo + ' propone repartir ' + colones(numero(datos.monto)) + ' (' + colones(numero(datos.monto) / 2) + ' c/u). Ábrala para aprobar.'
+          : datos.accion === 'aprobar' ? yo + ' aprobó el reparto de ' + colones(resR.monto) + '. Ya pueden sacarlo del sobre.'
+          : datos.accion === 'rechazar' ? yo + ' no aprobó el reparto propuesto.' : '';
+        if (txt) notificar_('Reparto 50/50', txt, '#/reparto', [otro]);
+      } catch (e) { }
+      return resR;
+    }
     case 'depositar':
       return conCandado_(function (db, config) { return accionDepositar(db, config, datos, hoy, correo); });
     case 'guardarGasto':

@@ -4,6 +4,14 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.5 · 23 nov 2026
+- Nuevo: Reparto 50/50 con aprobación (Finanzas → "Para repartir" → "Proponer reparto").
+  Uno propone el monto (máximo lo disponible, ya descontada la reserva de créditos) y el otro
+  lo aprueba o no desde su celular (con Face ID / huella). Al aprobar se registra la salida del
+  sobre como "Reparto 50/50"; luego se saca del sobre en el banco. Quien propuso puede cancelar.
+  La propuesta aparece de primera en Alertas del otro socio.
+- Motor: SÍ → copiar Codigo.gs, Logica.gs y Tareas.gs a Apps Script y hacer Nueva versión.
+
 ## 3.4 · 23 nov 2026
 - Guardar cobros, abonos, depósitos y gastos es más rápido: el motor escribe todo de una sola
   vez en vez de celda por celda, y no vuelve a leer la configuración en cada llamada.

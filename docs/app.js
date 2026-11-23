@@ -127,7 +127,7 @@
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
             }
-            var fn = { depositar: accionDepositar, guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
+            var fn = { reparto: accionReparto, depositar: accionDepositar, guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
             if (!fn) throw new Error('Acción desconocida');
             r = fn(db, config, datos, hoy, correo, tc);
             aplicarCambiosEnMemoria(db, r.cambios); guardarDemo();
@@ -447,7 +447,7 @@
     return barra('Alertas', '#/inicio') + '<p class="nota" style="margin:0 0 10px">Cosas que revisar en el negocio</p>' +
       (a.length ? '<div class="card">' + a.map(function (x) {
         var href = x.usuario ? ((x.tipo === 'Vencido' || x.tipo === 'Por vencer') ? '#/mensaje/' : x.tipo === 'Cobro' ? '#/deuda/' : '#/cliente/') + encodeURIComponent(x.usuario) :
-          x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : x.tipo === 'Depósito' ? '#/depositar' : x.tipo === 'Créditos' ? '#/finanzas' : '#/inicio';
+          x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : x.tipo === 'Depósito' ? '#/depositar' : x.tipo === 'Reparto' ? '#/reparto' : x.tipo === 'Créditos' ? '#/finanzas' : '#/inicio';
         return '<a class="fila" href="' + href + '"><span class="punto ' + x.nivel + '"></span><span class="txt"><span class="t2" style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;font-size:11px">' +
           esc(x.tipo) + '</span><span class="t1">' + esc(x.titulo) + '</span><span class="t2">' + esc(x.detalle) + '</span></span></a>';
       }).join('') + '</div>' : '<div class="card"><div class="vacio">Todo en orden. No hay alertas.</div></div>');
@@ -813,7 +813,9 @@
       '<div class="dato"><span class="l">Reserva para créditos</span><span class="v" style="color:var(--naranja-txt);white-space:nowrap">' + colonesDec(-r.reserva) + '</span></div>' +
       '<div class="nota" style="margin-top:-4px">' + r.usadosDesdeCompra + ' créditos usados desde la última compra × $' + S.datos.config.costo_credito + ' × cambio BCR ' + colonesDec(r.tipoCambio) + '</div>' +
       '<div class="dato"><span class="l"><b style="color:var(--texto)">Disponible para repartir</b></span><span class="v" style="color:var(--verde-txt)">' + colonesDec(r.disponible) + '</span></div>' +
-      '<div class="nota">' + colonesDec(r.disponible / 2) + ' para cada uno. Los retiros con aprobación llegan en la etapa 2.</div></div>' +
+      '<div class="nota">' + colonesDec(r.disponible / 2) + ' para cada uno.</div>' +
+      (S.datos.config.reparto ? '<a class="btn" href="#/reparto" style="margin-top:6px">' + (S.datos.config.reparto.propone === S.datos.socio ? 'Reparto esperando aprobación' : 'Revisar reparto propuesto') + ' (' + colonesDec(S.datos.config.reparto.monto) + ')</a>'
+        : '<a class="btn sec" href="#/reparto" style="margin-top:6px">Proponer reparto</a>') + '</div>' +
       '<div class="tiles" style="grid-template-columns:repeat(2,1fr);margin-top:10px"><div class="tile"><span>Pendiente por cobrar</span><b style="font-size:18px;color:var(--naranja-txt)">' + colonesDec(r.pendiente) + '</b></div>' +
       '<div class="tile"><span>Incobrable</span><b style="font-size:18px;color:var(--suave)">' + colonesDec(r.incobrable) + '</b></div></div>' +
       '<div class="etq" style="display:flex;justify-content:space-between;align-items:center">Movimientos del sobre<a href="#/movimientos" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--texto);font-weight:600">Ver todos ›</a></div>' +
@@ -861,6 +863,36 @@
       '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>Diferencia en ' + esc(rg.nombre) + '</span><b style="font-size:18px;color:' + (entradas + salidas >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (entradas + salidas >= 0 ? '+' : '−') + colonesDec(Math.abs(entradas + salidas)) + '</b></div>' +
       (M.filtro !== 'todos' ? '<p class="nota">Mostrando solo ' + M.filtro + '. <a href="#" id="mfil-x" style="color:var(--texto)">Ver todo</a></p>' : '') +
       '<div class="card" style="margin-top:10px">' + (lista.length ? lista.map(filaMov).join('') : '<div class="vacio">Sin movimientos en ' + esc(rg.nombre) + '</div>') + '</div>';
+  }
+
+  /* --- Reparto 50/50 con aprobación --- */
+  function pReparto() {
+    var r = S.datos.resumen, rp = S.datos.config.reparto, yo = S.datos.socio, otro = yo === 'Jonathan' ? 'Fernando' : 'Jonathan';
+    var h = barra('Reparto 50/50', '#/finanzas');
+    if (rp) {
+      var mio = rp.propone === yo;
+      h += '<div class="card pad" style="text-align:center;padding:22px 16px">' +
+        '<div class="nota" style="margin:0">' + esc(rp.propone) + ' propuso el ' + fechaCorta(rp.fecha) + '</div>' +
+        '<div style="font-size:34px;font-weight:800;margin:6px 0">' + colonesDec(rp.monto) + '</div>' +
+        '<div style="font-size:17px"><b>' + colonesDec(rp.monto / 2) + '</b> para cada uno</div>' +
+        (rp.nota ? '<p class="nota">“' + esc(rp.nota) + '”</p>' : '') + '</div>' +
+        '<div class="card pad" style="margin-top:8px"><div class="dato" style="border:0;padding:0"><span class="l">Disponible hoy</span><span class="v">' + colonesDec(r.disponible) + '</span></div>' +
+        '<div class="dato" style="border:0;padding:6px 0 0"><span class="l">Queda después del reparto</span><span class="v">' + colonesDec(r.disponible - rp.monto) + '</span></div></div>';
+      if (mio) h += '<div class="aviso" style="margin-top:12px">' + ico('alerta') + '<div><b>Esperando a ' + otro + '</b>Le llega el aviso para aprobarlo en su celular.</div></div>' +
+        '<button class="btn sec" id="rep-cancelar" style="margin-top:12px">Cancelar mi propuesta</button>';
+      else h += '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn sec" id="rep-rechazar" style="flex:1;width:auto">No aprobar</button>' +
+        '<button class="btn verde" id="rep-aprobar" style="flex:1;width:auto">Aprobar</button></div>' +
+        '<p class="nota">Al aprobar, la app registra la salida del sobre. Luego sáquenlo del sobre en el banco.</p>';
+      return h;
+    }
+    var sug = Math.max(0, Math.floor(r.disponible / 1000) * 1000);
+    return h + '<div class="card pad"><div class="dato" style="border:0;padding:0"><span class="l">Disponible para repartir</span><span class="v" style="color:var(--verde-txt)">' + colonesDec(r.disponible) + '</span></div>' +
+      '<div class="nota" style="margin:6px 0 0">Ya descontada la reserva para comprar créditos (' + colonesDec(r.reserva) + ').</div></div>' +
+      '<div class="etq">¿Cuánto quieren repartir en total?</div><input id="rep-monto" class="input campo-monto" type="text" inputmode="decimal" value="' + montoCampo(sug) + '">' +
+      '<p class="nota" id="rep-cu" style="margin:6px 2px 0"><b>' + colonesDec(sug / 2) + '</b> para cada uno</p>' +
+      '<div class="etq">Nota (opcional)</div><input id="rep-nota" class="input" type="text" placeholder="Ej.: reparto de noviembre">' +
+      '<button class="btn" id="rep-proponer" style="margin-top:14px">Proponer a ' + otro + '</button>' +
+      '<p class="nota">' + otro + ' tiene que aprobarlo en su celular. Nadie saca plata del sobre sin que el otro esté de acuerdo.</p>';
   }
 
   /* --- Pasar al sobre lo cobrado que no se ha depositado --- */
@@ -1212,7 +1244,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, depositar: { tab: 'finanzas', fn: pDepositar }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, depositar: { tab: 'finanzas', fn: pDepositar }, reparto: { tab: 'finanzas', fn: pReparto }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -1449,6 +1481,28 @@
       x.addEventListener('blur', function () { var n = leerMonto(x.value); if (x.value.trim() !== '') x.value = montoCampo(n); });
       x.addEventListener('focus', function () { setTimeout(function () { try { x.select(); } catch (e) { } }, 0); });
     });
+    if (ruta === 'reparto') {
+      var hacer = function (btn, datos, ok) {
+        guardando(btn, api('reparto', datos)).then(function (res) { return refrescar().then(function () { toast(ok(res)); render(); }); });
+      };
+      if ($('rep-monto')) $('rep-monto').addEventListener('input', function () { $('rep-cu').innerHTML = '<b>' + colonesDec(leerMonto(this.value) / 2) + '</b> para cada uno'; });
+      if ($('rep-proponer')) $('rep-proponer').onclick = function () {
+        var m = leerMonto($('rep-monto').value);
+        if (!(m > 0)) { toast('Escriba el monto'); return; }
+        if (m > S.datos.resumen.disponible + 1) { toast('Solo hay ' + colonesDec(S.datos.resumen.disponible) + ' disponibles'); return; }
+        if (!window.confirm('¿Proponer repartir ' + colonesDec(m) + ' (' + colonesDec(m / 2) + ' c/u)?')) return;
+        hacer(this, { accion: 'proponer', monto: m, nota: $('rep-nota').value, tipoCambio: S.datos.tipoCambio }, function () { return 'Propuesta enviada'; });
+      };
+      if ($('rep-cancelar')) $('rep-cancelar').onclick = function () { if (window.confirm('¿Cancelar la propuesta?')) hacer(this, { accion: 'cancelar' }, function () { return 'Propuesta cancelada'; }); };
+      if ($('rep-rechazar')) $('rep-rechazar').onclick = function () { if (window.confirm('¿No aprobar este reparto?')) hacer(this, { accion: 'rechazar' }, function () { return 'Reparto no aprobado'; }); };
+      if ($('rep-aprobar')) $('rep-aprobar').onclick = function () {
+        var rp = S.datos.config.reparto;
+        if (!window.confirm('¿Aprobar el reparto de ' + colonesDec(rp.monto) + ' (' + colonesDec(rp.monto / 2) + ' c/u)?')) return;
+        confirmarIdentidad().then(function () {
+          hacer($('rep-aprobar'), { accion: 'aprobar' }, function () { return '✓ Reparto aprobado y registrado'; });
+        }, function () { });
+      };
+    }
     if (ruta === 'depositar' && $('dep-ok')) {
       todos('[data-dep]', function (x) { x.onchange = function () {
         var i = S.dep.ids.indexOf(x.dataset.dep);

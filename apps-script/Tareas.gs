@@ -185,10 +185,11 @@ function respaldoSemanal() {
 
 /* ============ Notificaciones al celular (OneSignal) ============ */
 
-function notificar_(titulo, texto, ruta) {
+function notificar_(titulo, texto, ruta, soloPara) {
   var appId = prop_('ONESIGNAL_APP_ID'), key = prop_('ONESIGNAL_API_KEY');
   var config = leerConfig(leerTabla_('Config'));
-  var para = [String(config.correo_jonathan).toLowerCase(), String(config.correo_fernando).toLowerCase()];
+  var para = soloPara ? soloPara.map(function (x) { return String(x).toLowerCase(); }) :
+    [String(config.correo_jonathan).toLowerCase(), String(config.correo_fernando).toLowerCase()];
   if (!appId || !key) {
     registrarNotificacion_(para.join(', '), titulo + ': ' + texto, 'sin configurar');
     return;

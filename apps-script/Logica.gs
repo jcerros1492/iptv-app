@@ -322,6 +322,9 @@ function alertas(db, config, hoy, lista, tipoCambio) {
     }
   });
   var r = resumen(db, config);
+  var rp = repartoPendiente(config);
+  if (rp) out.unshift({ tipo: 'Reparto', nivel: 'azul', titulo: rp.propone + ' propone repartir ' + colones(rp.monto),
+    detalle: colones(rp.monto / 2) + ' para cada uno · toque para revisar' });
   if (r.sinDepositar > 0) {
     out.push({ tipo: 'Depósito', nivel: 'naranja', titulo: colones(r.sinDepositar) + ' sin depositar en el sobre',
       detalle: 'Toque cuando lo pase al sobre del BCR' });
@@ -337,7 +340,10 @@ function alertas(db, config, hoy, lista, tipoCambio) {
       detalle: textoAdobe(config, tipoCambio) + ' · toque para registrarlo' });
   }
   var orden = { rojo: 0, naranja: 1, azul: 2 };
-  return out.sort(function (a, b) { return orden[a.nivel] - orden[b.nivel]; });
+  out.sort(function (a, b) { return orden[a.nivel] - orden[b.nivel]; });
+  // El reparto propuesto va siempre de primero
+  out.sort(function (a, b) { return (a.tipo === 'Reparto' ? 0 : 1) - (b.tipo === 'Reparto' ? 0 : 1); });
+  return out;
 }
 
 /* ---------------- Mensajes de WhatsApp ---------------- */
@@ -586,6 +592,53 @@ function accionDepositar(db, config, p, hoy, correo) {
   return { resultado: { ok: true, total: total, cantidad: lista.length }, cambios: cambios };
 }
 
+/* ---------------- Reparto 50/50 con aprobación ----------------
+ * Uno propone, el otro aprueba. Mientras tanto la propuesta vive en Config ("reparto_pendiente").
+ * Al aprobar se registra la salida del sobre como "Reparto 50/50".
+ */
+function repartoPendiente(config) {
+  var v = config.reparto_pendiente;
+  if (!v) return null;
+  try { var o = typeof v === 'string' ? JSON.parse(v) : v; return o && o.monto ? o : null; } catch (e) { return null; }
+}
+
+function accionReparto(db, config, p, hoy, correo) {
+  var socio = nombreSocio(config, correo), pend = repartoPendiente(config);
+  var guardar = function (v) { return { tabla: 'Config', op: 'actualizar', clave: 'Clave', valor: 'reparto_pendiente', fila: { Valor: v ? JSON.stringify(v) : '' } }; };
+  var log = function (accion, detalle) { return { tabla: 'Accesos', op: 'agregar', fila: { Fecha: hoy, Usuario: socio, 'Acción': accion, Detalle: detalle } }; };
+
+  if (p.accion === 'proponer') {
+    if (pend) throw new Error('Ya hay un reparto esperando aprobación (' + colones(pend.monto) + ').');
+    var monto = Math.round(numero(p.monto) * 100) / 100;
+    if (!(monto > 0)) throw new Error('Escriba cuánto quieren repartir.');
+    var r = resumen(db, config, numero(p.tipoCambio) || undefined);
+    if (monto > r.disponible + 1) throw new Error('Solo hay ' + colones(r.disponible) + ' disponibles para repartir.');
+    var prop = { monto: monto, propone: socio, fecha: hoy, nota: String(p.nota || '').slice(0, 200) };
+    return { resultado: { ok: true, propuesta: prop }, cambios: [guardar(prop), log('Propone reparto', colones(monto) + ' (' + colones(monto / 2) + ' c/u)')] };
+  }
+  if (!pend) throw new Error('No hay ningún reparto pendiente.');
+  if (p.accion === 'cancelar') {
+    if (pend.propone !== socio) throw new Error('Solo ' + pend.propone + ' puede cancelar su propuesta.');
+    return { resultado: { ok: true }, cambios: [guardar(null), log('Cancela reparto', colones(pend.monto))] };
+  }
+  if (p.accion === 'rechazar') {
+    if (pend.propone === socio) throw new Error('La propuesta la tiene que revisar el otro socio.');
+    return { resultado: { ok: true }, cambios: [guardar(null), log('Rechaza reparto', colones(pend.monto) + ' propuesto por ' + pend.propone)] };
+  }
+  if (p.accion === 'aprobar') {
+    if (pend.propone === socio) throw new Error('La propuesta la tiene que aprobar el otro socio.');
+    return { resultado: { ok: true, monto: pend.monto }, cambios: [
+      { tabla: 'Movimientos', op: 'agregar', fila: {
+        ID: nuevoId_('M', hoy, db.movimientos), Fecha: hoy, Tipo: 'Reparto 50/50', 'Descripción': 'Reparto 50/50',
+        Monto: -pend.monto, 'Créditos': 0, 'Afecta sobre': 'Sí', 'Registró': pend.propone + ' y ' + socio,
+        Nota: colones(pend.monto / 2) + ' c/u · propuso ' + pend.propone + ' el ' + fechaCorta(pend.fecha) + ', aprobó ' + socio + (pend.nota ? ' · ' + pend.nota : '')
+      } },
+      guardar(null), log('Aprueba reparto', colones(pend.monto) + ' propuesto por ' + pend.propone)
+    ] };
+  }
+  throw new Error('Acción no válida.');
+}
+
 function accionGuardarControl(db, config, p, hoy, correo) {
   return { resultado: { ok: true }, cambios: [
     { tabla: 'Controles', op: 'agregar', fila: { Fecha: hoy, 'Sobre real': numero(p.sobreReal), 'Créditos panel': numero(p.creditosPanel), 'Registró': nombreSocio(config, correo) } }
@@ -619,6 +672,7 @@ function armarEstado(db, config, hoy, correo, tipoCambio) {
       regalias: { 3: config.regalia_3, 6: config.regalia_6, 12: config.regalia_12 },
       telefono_jonathan: config.telefono_jonathan, telefono_fernando: config.telefono_fernando,
       adobe_proximo: config.adobe_proximo, adobe_monto: config.adobe_monto, tipo_cambio_respaldo: config.tipo_cambio_respaldo,
+      reparto: repartoPendiente(config),
       dias_reaviso: config.dias_reaviso, adobe_usd: config.adobe_usd, adobe_cada_meses: config.adobe_cada_meses
     },
     tipoCambio: numero(tipoCambio) || numero(config.tipo_cambio_respaldo),
@@ -721,7 +775,7 @@ function aplicarCambiosEnMemoria(db, cambios) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { reporte: reporte, accionDepositar: accionDepositar, accionGuardarGasto: accionGuardarGasto, textoAdobe: textoAdobe,
+  module.exports = { reporte: reporte, accionReparto: accionReparto, repartoPendiente: repartoPendiente, accionDepositar: accionDepositar, accionGuardarGasto: accionGuardarGasto, textoAdobe: textoAdobe,
     sumarMeses: sumarMeses, sumarDias: sumarDias, diasEntre: diasEntre, fechaCorta: fechaCorta,
     redondear: redondear, colones: colones, numero: numero, leerConfig: leerConfig, CONFIG_POR_DEFECTO: CONFIG_POR_DEFECTO,
     calcularCobro: calcularCobro, evaluarPago: evaluarPago, resumen: resumen, alertas: alertas,

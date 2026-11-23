@@ -1409,6 +1409,15 @@
     if (ruta === 'finanzas' && !S.repBase && !DEMO) cargarBaseReportes();
     // Campos de dinero: al salir del campo se escribe con separador de miles (₡20.880)
     todos('.campo-monto, #monto', function (x) {
+      // Mientras se escribe: ₡1 → ₡10 → ₡100 → ₡1.000 → ₡10.000 (la coma es para céntimos)
+      x.addEventListener('input', function () {
+        var v = x.value, coma = v.lastIndexOf(',');
+        var ent = (coma >= 0 ? v.slice(0, coma) : v).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+        var dec = coma >= 0 ? v.slice(coma + 1).replace(/\D/g, '').slice(0, 2) : null;
+        if (!ent && dec === null) { x.value = ''; return; }
+        var nuevo = '₡' + (ent || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec !== null ? ',' + dec : '');
+        if (nuevo !== v) { x.value = nuevo; try { x.setSelectionRange(nuevo.length, nuevo.length); } catch (e) { } }
+      });
       x.addEventListener('blur', function () { var n = leerMonto(x.value); if (x.value.trim() !== '') x.value = montoCampo(n); });
       x.addEventListener('focus', function () { setTimeout(function () { try { x.select(); } catch (e) { } }, 0); });
     });

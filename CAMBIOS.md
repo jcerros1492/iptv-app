@@ -4,6 +4,11 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.2 · 23 nov 2026
+- Los montos se van formateando mientras se escriben: ₡1 → ₡10 → ₡100 → ₡1.000 → ₡10.000.
+  La coma del teclado es para céntimos (₡9.095,45).
+- Motor: no.
+
 ## 3.1 · 23 nov 2026
 - Los campos de dinero muestran el separador de miles (₡20.880; con céntimos ₡9.095,45).
   Al tocar el campo se selecciona todo para escribir encima.

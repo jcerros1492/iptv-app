@@ -1,8 +1,7 @@
 {
-  "version": "3.1",
+  "version": "3.2",
   "fecha": "2026-11-23",
   "cambios": [
-    "Montos con separador de miles al escribir",
-    "Pago de deuda avisa cuánto queda debiendo"
+    "El separador de miles aparece mientras escribe el monto"
   ]
 }

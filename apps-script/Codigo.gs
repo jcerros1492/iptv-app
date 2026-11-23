@@ -166,8 +166,8 @@ function ejecutar_(accion, datos, correo) {
       var dbR = cargarDb_();
       var pick = function (l, campos) { return l.map(function (f) { var o = {}; campos.forEach(function (k) { o[k] = f[k]; }); return o; }); };
       return {
-        cobros: pick(dbR.cobros, ['Fecha', 'Usuario', 'Tipo', 'Dispositivos', 'Meses', 'Regalía', 'Créditos', 'Monto', 'Estado', 'Forma de pago', 'Cobró']),
-        movimientos: pick(dbR.movimientos, ['Fecha', 'Tipo', 'Descripción', 'Monto', 'Nota']),
+        cobros: pick(dbR.cobros, ['Fecha', 'Usuario', 'Tipo', 'Dispositivos', 'Meses', 'Regalía', 'Créditos', 'Monto', 'Estado', 'Forma de pago', 'Cobró', 'En sobre']),
+        movimientos: pick(dbR.movimientos, ['Fecha', 'Tipo', 'Descripción', 'Monto', 'Nota', 'Afecta sobre']),
         clientes: pick(dbR.clientes, ['Usuario', 'Creado'])
       };
     }

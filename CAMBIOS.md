@@ -4,6 +4,15 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.7 · 23 nov 2026
+- Finanzas: "Últimos movimientos" y "Últimos cobros" se unieron en "Movimientos del sobre":
+  entradas (cobros, pagos de deuda, aportes) en verde con "+" y salidas (gastos, créditos,
+  repartos) en rojo con "−". Se ven los 12 más recientes.
+- "Ver todos ›": todos los movimientos por periodo (este mes, mes anterior, este año, todo o
+  escoger mes), con total de entradas, salidas y la diferencia. Se puede filtrar solo entradas
+  o solo salidas tocando esos cuadros.
+- Motor: SÍ → copiar Codigo.gs a Apps Script y hacer Nueva versión.
+
 ## 2.6 · 22 nov 2026
 - Reportes (Pagos y Por cliente): buscador fijo por nombre, usuario o teléfono.
 - Al tocar un cliente se ve su reporte: cuánto pagó, pagos, meses, si debe (con botón para

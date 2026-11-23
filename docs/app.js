@@ -791,13 +791,51 @@
       '<div class="nota">' + colones(r.disponible / 2) + ' para cada uno. Los retiros con aprobación llegan en la etapa 2.</div></div>' +
       '<div class="tiles" style="grid-template-columns:repeat(2,1fr);margin-top:10px"><div class="tile"><span>Pendiente por cobrar</span><b style="font-size:18px;color:var(--naranja-txt)">' + colones(r.pendiente) + '</b></div>' +
       '<div class="tile"><span>Incobrable</span><b style="font-size:18px;color:var(--suave)">' + colones(r.incobrable) + '</b></div></div>' +
-      '<div class="etq">Últimos movimientos</div><div class="card">' + S.datos.movimientos.slice(0, 8).map(function (m) {
-        return '<div class="fila"><span class="txt"><span class="t1">' + esc(m.Tipo) + '</span><span class="t2">' + fechaCorta(m.Fecha) + (m.Nota ? ' · ' + esc(m.Nota) : '') + '</span></span><b style="font-size:14px">' + colones(numero(m.Monto)) + '</b></div>';
-      }).join('') + '</div>' +
-      '<div class="etq">Últimos cobros</div><div class="card">' + S.datos.cobros.slice(0, 10).map(function (x) {
-        return '<a class="fila" href="#/cliente/' + encodeURIComponent(x.Usuario) + '"><span class="txt"><span class="t1">' + esc(x.Usuario) + '</span><span class="t2">' + fechaCorta(x.Fecha) +
-          (x['Cobró'] ? ' · ' + esc(x['Cobró']) : '') + '</span></span><span style="text-align:right"><b style="font-size:14px;display:block">' + colones(numero(x.Monto)) + '</b><span class="chip ' + (x.Estado === 'Pagado' ? 'verde' : x.Estado === 'Pendiente' ? 'naranja' : '') + '">' + esc(x.Estado) + '</span></span></a>';
-      }).join('') + '</div>';
+      '<div class="etq" style="display:flex;justify-content:space-between;align-items:center">Movimientos del sobre<a href="#/movimientos" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--texto);font-weight:600">Ver todos ›</a></div>' +
+      '<div class="card">' + movimientosSobre(S.datos.cobros, S.datos.movimientos).slice(0, 12).map(filaMov).join('') + '</div>' +
+      '<p class="nota">Entradas en verde (cobros y aportes) y salidas en rojo (gastos, créditos y repartos).</p>';
+  }
+
+  /** Entradas y salidas del sobre juntas, de la más nueva a la más vieja. */
+  function movimientosSobre(cobros, movs) {
+    var l = [];
+    cobros.forEach(function (c) {
+      if (c.Estado !== 'Pagado') return;
+      l.push({ fecha: String(c.Fecha).slice(0, 10), titulo: (c.Tipo === 'Pago de deuda' ? 'Pago de deuda · ' : 'Cobro · ') + c.Usuario,
+        detalle: [c['Forma de pago'], c['Cobró'], c['En sobre'] === 'No' ? 'sin depositar' : ''].filter(Boolean).join(' · '), monto: numero(c.Monto), usuario: c.Usuario });
+    });
+    movs.forEach(function (m) {
+      if (m['Afecta sobre'] === 'No') return;
+      l.push({ fecha: String(m.Fecha).slice(0, 10), titulo: m.Tipo, detalle: m.Nota || m['Descripción'] || '', monto: numero(m.Monto) });
+    });
+    return l.sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; });
+  }
+  function filaMov(m) {
+    var pos = m.monto >= 0;
+    var tag = m.usuario ? 'a' : 'div';
+    return '<' + tag + ' class="fila"' + (m.usuario ? ' href="#/cliente/' + encodeURIComponent(m.usuario) + '" style="text-decoration:none;color:inherit"' : '') + '><span class="txt"><span class="t1">' + esc(m.titulo) + '</span><span class="t2">' + fechaCorta(m.fecha) + (m.detalle ? ' · ' + esc(m.detalle) : '') + '</span></span>' +
+      '<b style="font-size:15px;white-space:nowrap;color:' + (pos ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (pos ? '+' : '−') + colones(Math.abs(m.monto)) + '</b></' + tag + '>';
+  }
+  /* --- Todos los movimientos --- */
+  function pMovimientos() {
+    if (!S.movs) S.movs = { periodo: 'mes', filtro: 'todos' };
+    var M = S.movs, rg = rangoPeriodo(M.periodo);
+    if (!S.repBase) { cargarBaseReportes(); return barra('Movimientos del sobre', '#/finanzas') + '<div class="cargando">Cargando movimientos…</div>'; }
+    var todos = movimientosSobre(S.repBase.cobros.map(function (c) { return c; }), S.repBase.movimientos)
+      .filter(function (m) { return m.fecha >= rg.desde && m.fecha <= rg.hasta; });
+    var entradas = 0, salidas = 0; todos.forEach(function (m) { if (m.monto >= 0) entradas += m.monto; else salidas += m.monto; });
+    var lista = todos.filter(function (m) { return M.filtro === 'todos' || (M.filtro === 'entradas' ? m.monto >= 0 : m.monto < 0); });
+    var chips = [['mes', 'Este mes'], ['anterior', 'Mes anterior'], ['anio', 'Este año'], ['todo', 'Todo']];
+    return barra('Movimientos del sobre', '#/finanzas') +
+      '<div class="filtros">' + chips.map(function (c) { return '<button class="filtro' + (M.periodo === c[0] ? ' sel' : '') + '" data-mper="' + c[0] + '">' + c[1] + '</button>'; }).join('') +
+      '<label class="filtro' + (/^\d{4}-\d{2}$/.test(M.periodo) ? ' sel' : '') + '" style="position:relative;display:inline-flex;align-items:center">' + (/^\d{4}-\d{2}$/.test(M.periodo) ? esc(rg.nombre) : 'Escoger mes…') +
+      '<input type="month" id="mmes" style="position:absolute;inset:0;opacity:0"></label></div>' +
+      '<div style="display:flex;gap:8px;margin-top:12px">' +
+      '<button class="card pad" data-mfil="entradas" style="flex:1;text-align:left;font:inherit;cursor:pointer;' + (M.filtro === 'entradas' ? 'border:2px solid var(--texto)' : '') + '"><div class="nota" style="margin:0">Entradas</div><b style="font-size:19px;color:var(--verde-txt)">+' + colones(entradas) + '</b></button>' +
+      '<button class="card pad" data-mfil="salidas" style="flex:1;text-align:left;font:inherit;cursor:pointer;' + (M.filtro === 'salidas' ? 'border:2px solid var(--texto)' : '') + '"><div class="nota" style="margin:0">Salidas</div><b style="font-size:19px;color:var(--rojo-txt)">−' + colones(-salidas) + '</b></button></div>' +
+      '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>Diferencia en ' + esc(rg.nombre) + '</span><b style="font-size:18px;color:' + (entradas + salidas >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (entradas + salidas >= 0 ? '+' : '−') + colones(Math.abs(entradas + salidas)) + '</b></div>' +
+      (M.filtro !== 'todos' ? '<p class="nota">Mostrando solo ' + M.filtro + '. <a href="#" id="mfil-x" style="color:var(--texto)">Ver todo</a></p>' : '') +
+      '<div class="card" style="margin-top:10px">' + (lista.length ? lista.map(filaMov).join('') : '<div class="vacio">Sin movimientos en ' + esc(rg.nombre) + '</div>') + '</div>';
   }
 
   /* --- Reportes --- */
@@ -919,7 +957,7 @@
     if (S.repCargando) return S.repCargando;
     S.repCargando = api('datosReporte').then(function (b) {
       S.repBase = b; S.repCargando = null; if (S.rep) S.rep.clave = null;
-      if (/^#\/reportes/.test(location.hash)) render();
+      if (/^#\/(reportes|movimientos)/.test(location.hash)) render();
     }, function (e) { S.repCargando = null; toast(e.message); });
     return S.repCargando;
   }
@@ -1084,7 +1122,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -1307,6 +1345,12 @@
       refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
     };
     if (ruta === 'finanzas' && !S.repBase && !DEMO) cargarBaseReportes();
+    if (ruta === 'movimientos') {
+      todos('[data-mper]', function (x) { x.onclick = function () { S.movs.periodo = x.dataset.mper; render(); }; });
+      todos('[data-mfil]', function (x) { x.onclick = function () { S.movs.filtro = S.movs.filtro === x.dataset.mfil ? 'todos' : x.dataset.mfil; render(); }; });
+      if ($('mfil-x')) $('mfil-x').onclick = function (e) { e.preventDefault(); S.movs.filtro = 'todos'; render(); };
+      if ($('mmes')) $('mmes').onchange = function () { if (this.value) { S.movs.periodo = this.value; render(); } };
+    }
     if (ruta === 'reportes') {
       todos('[data-rtab]', function (x) { x.onclick = function () { S.rep.tab = x.dataset.rtab; if (S.rep.tab === 'negocio') S.rep.cliente = null; render(); }; });
       var enlazarCuerpo = function () {

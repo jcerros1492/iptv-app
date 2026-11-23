@@ -1,8 +1,8 @@
 {
-  "version": "2.6",
-  "fecha": "2026-11-22",
+  "version": "2.7",
+  "fecha": "2026-11-23",
   "cambios": [
-    "Reportes: buscador por nombre, usuario o teléfono",
-    "Reporte de un solo cliente"
+    "Movimientos del sobre: entradas en verde y salidas en rojo",
+    "Ver todos los movimientos por mes"
   ]
 }

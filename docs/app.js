@@ -46,6 +46,12 @@
    * Lee un monto escrito por la persona: acepta 9095,45 · 9095.45 · 9.095,45 · 9,095.45 · 176762.92 · ₡20.880
    * Regla: el último punto o coma seguido de 1 o 2 cifras es decimal; los demás son de miles.
    */
+  /** Monto para escribir en un campo: ₡20.880 o ₡9.095,45 (con céntimos si los tiene). */
+  function montoCampo(n) {
+    n = Math.round(numero(n) * 100) / 100;
+    var ent = Math.floor(Math.abs(n)), dec = Math.round((Math.abs(n) - ent) * 100);
+    return (n < 0 ? '−' : '') + '₡' + String(ent).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + (dec < 10 ? '0' : '') + dec : '');
+  }
   function leerMonto(v) {
     if (typeof v === 'number') return v;
     var t = String(v || '').replace(/[^\d.,-]/g, '');
@@ -864,7 +870,7 @@
         '<div class="dato" style="border:0;padding:6px 0 0"><span class="l">Próximo pago</span><span class="v">' + (c.adobe_proximo ? fechaCorta(c.adobe_proximo) : '—') + '</span></div></div>' +
         '<p class="nota">Escriba lo que <b>de verdad</b> cobró el banco (está en el estado de la tarjeta). Así el sobre queda exacto.</p>'
         : '<div class="etq">¿En qué fue?</div><input id="g-desc" class="input" type="text" placeholder="Ej.: curso, comisión, otro servicio" value="' + esc(g.descripcion) + '">') +
-      '<div class="etq">Monto en colones</div><input id="g-monto" class="input" type="text" inputmode="decimal" value="' + (monto === '' ? '' : numero(monto)) + '" placeholder="₡">' +
+      '<div class="etq">Monto en colones</div><input id="g-monto" class="input campo-monto" type="text" inputmode="decimal" value="' + (monto === '' ? '' : montoCampo(monto)) + '" placeholder="₡">' +
       '<div class="etq">Fecha del cobro</div><input id="g-fecha" class="input" type="date" value="' + esc(g.fecha) + '">' +
       '<label class="check" style="margin-top:10px"><input type="checkbox" id="g-sobre"' + (g.afectaSobre ? ' checked' : '') + '>Sale del sobre BCR</label>' +
       '<button class="btn" id="g-ok" style="margin-top:10px">Guardar gasto</button>';
@@ -1117,11 +1123,22 @@
           '<span>' + mesDeuda(x.Fecha) + '<br><small>' + fechaCorta(x.Fecha) + '</small></span></span><span class="v">' + colones(numero(x.Monto)) + '</span></label>';
       }).join('') +
       '<div class="dato"><span class="l"><b>A pagar ahora</b>' + (sel.length < pend.length ? '<br><small>Queda debiendo ' + colones(c.debe - totalSel) + '</small>' : '') + '</span><span class="v"><b>' + colones(totalSel) + '</b></span></div></div>' +
-      '<div class="etq">¿Cuánto pagó?</div><input id="deuda-monto" class="input" type="text" inputmode="decimal" value="' + numero(monto) + '">' +
+      '<div class="etq">¿Cuánto pagó?</div><input id="deuda-monto" class="input campo-monto" type="text" inputmode="decimal" value="' + montoCampo(monto) + '">' +
+      '<p class="nota" id="deuda-queda" style="margin:6px 2px 0">' + textoQueda(c.debe, totalSel, numero(monto)) + '</p>' +
       '<div class="etq">Forma de pago</div><div class="opciones c2"><button class="op' + (d.forma === 'SINPE' ? ' sel' : '') + '" data-dforma="SINPE">SINPE</button><button class="op' + (d.forma === 'Efectivo' ? ' sel' : '') + '" data-dforma="Efectivo">Efectivo</button></div>' +
       '<label class="check"><input type="checkbox" id="deuda-sobre"' + (d.enSobre ? ' checked' : '') + '>Ya está en el sobre BCR</label>' +
       '<p class="nota">Marque los meses que paga. Si paga menos de lo marcado, queda debiendo la diferencia.</p>' +
       '<button class="btn" id="deuda-ok" style="margin-top:6px"' + (sel.length ? '' : ' disabled') + '>Guardar pago</button>';
+  }
+  function textoQueda(debeTodo, marcado, pago) {
+    if (!(pago > 0)) return '';
+    var tol = numero(S.datos.config.tolerancia) || 0;
+    if (pago >= marcado - tol) {
+      var resto = debeTodo - marcado;
+      return pago > marcado + tol ? 'Paga ' + colones(pago - marcado) + ' de más (cuenta como ingreso extra).' + (resto > 0 ? ' Queda debiendo ' + colones(resto) + ' de lo no marcado.' : '')
+        : (resto > 0 ? 'Salda lo marcado. Queda debiendo ' + colones(resto) + ' de lo no marcado.' : '✓ Salda toda la deuda.');
+    }
+    return 'Es un abono: queda debiendo <b>' + colones(debeTodo - pago) + '</b>. Se salda primero el mes más viejo.';
   }
   function mesDeuda(f) {
     var m = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
@@ -1390,6 +1407,11 @@
       refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
     };
     if (ruta === 'finanzas' && !S.repBase && !DEMO) cargarBaseReportes();
+    // Campos de dinero: al salir del campo se escribe con separador de miles (₡20.880)
+    todos('.campo-monto, #monto', function (x) {
+      x.addEventListener('blur', function () { var n = leerMonto(x.value); if (x.value.trim() !== '') x.value = montoCampo(n); });
+      x.addEventListener('focus', function () { setTimeout(function () { try { x.select(); } catch (e) { } }, 0); });
+    });
     if (ruta === 'gasto') {
       var leer = function () { S.gasto.monto = $('g-monto').value === '' ? null : leerMonto($('g-monto').value); S.gasto.fecha = $('g-fecha').value || S.datos.hoy; if ($('g-desc')) S.gasto.descripcion = $('g-desc').value; };
       todos('[data-gtipo]', function (x) { x.onclick = function () { leer(); S.gasto.tipo = x.dataset.gtipo; S.gasto.monto = null; render(); }; });
@@ -1482,7 +1504,12 @@
           render();
         };
       });
-      $('deuda-monto').oninput = function () { S.deuda.monto = leerMonto(this.value); };
+      $('deuda-monto').oninput = function () {
+        S.deuda.monto = leerMonto(this.value);
+        var cl = cliente(arg), marc = S.datos.cobros.filter(function (x) { return x.Usuario === arg && x.Estado === 'Pendiente' && S.deuda.ids.indexOf(x.ID) >= 0; })
+          .reduce(function (t, x) { return t + numero(x.Monto); }, 0);
+        $('deuda-queda').innerHTML = textoQueda(cl ? cl.debe : marc, marc, S.deuda.monto);
+      };
       $('deuda-sobre').onchange = function () { S.deuda.enSobre = this.checked; };
       $('deuda-ok').onclick = function () {
         var m = leerMonto($('deuda-monto').value);

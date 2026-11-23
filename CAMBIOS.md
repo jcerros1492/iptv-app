@@ -4,6 +4,14 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.1 · 23 nov 2026
+- Los campos de dinero muestran el separador de miles (₡20.880; con céntimos ₡9.095,45).
+  Al tocar el campo se selecciona todo para escribir encima.
+- Pago de deuda: debajo del monto se ve en vivo qué pasa con ese pago
+  ("Es un abono: queda debiendo ₡10.880", "✓ Salda toda la deuda", etc.).
+- Incluye la 3.0.
+- Motor: no (si no instaló la 3.0, pegue Codigo.gs, Logica.gs y Tareas.gs de la 3.0).
+
 ## 3.0 · 23 nov 2026
 - Tema oscuro: Ajustes → Apariencia → Automático (sigue al celular), Claro u Oscuro.
 - Nuevo: Registrar gasto (Finanzas → "+ Gasto", o tocando la alerta de Adobe).

@@ -4,6 +4,13 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.7 · 23 nov 2026
+- Notificaciones al celular con OneSignal (App ID 5c2da857-…). Ajustes → Notificaciones →
+  "Activar en este celular". Cuando están activas aparece "Enviar prueba".
+- Ajustes muestra el estado: activas, apagadas, bloqueadas o "instale la app primero".
+- Motor: SÍ → copiar Codigo.gs a Apps Script y hacer Nueva versión. Además, en Propiedades del
+  script deben estar ONESIGNAL_APP_ID y ONESIGNAL_API_KEY.
+
 ## 3.6 · 23 nov 2026
 - Revisadas todas las pantallas en iPhone SE (320), Android chico (360), Android (393),
   iPhone Pro Max (430) y tablet (768), en tema claro y oscuro. Se corrigió Finanzas y el

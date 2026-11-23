@@ -162,6 +162,12 @@ function ejecutar_(accion, datos, correo) {
       return conCandado_(function (db, config) { return accionGuardarCliente(db, config, datos, hoy, correo); });
     case 'pagarDeuda':
       return conCandado_(function (db, config) { return accionPagarDeuda(db, config, datos, hoy, correo); });
+    case 'probarNotificacion': {
+      if (!prop_('ONESIGNAL_APP_ID') || !prop_('ONESIGNAL_API_KEY')) return { ok: false, error: 'faltan ONESIGNAL_APP_ID y ONESIGNAL_API_KEY en las Propiedades del script' };
+      var cfgP = configRapida_();
+      notificar_('Prueba', 'Hola ' + nombreSocio(cfgP, correo) + ', las notificaciones funcionan en este celular ✓', '#/inicio', [correo]);
+      return { ok: true };
+    }
     case 'reparto': {
       var resR = conCandado_(function (db, config) { return accionReparto(db, config, datos, hoy, correo); });
       // Avisar al otro socio

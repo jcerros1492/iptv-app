@@ -127,7 +127,7 @@
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
             }
-            var fn = { reparto: accionReparto, depositar: accionDepositar, guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
+            var fn = { probarNotificacion: function () { return { resultado: { ok: true }, cambios: [] }; }, reparto: accionReparto, depositar: accionDepositar, guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
             if (!fn) throw new Error('Acción desconocida');
             r = fn(db, config, datos, hoy, correo, tc);
             aplicarCambiosEnMemoria(db, r.cambios); guardarDemo();
@@ -377,16 +377,32 @@
       document.head.appendChild(s);
       window.OneSignalDeferred.push(function (OneSignal) {
         var base = location.pathname.replace(/[^/]*$/, '').replace(/^\//, '');
-        return OneSignal.init({ appId: CFG.ONESIGNAL_APP_ID, serviceWorkerPath: base + 'OneSignalSDKWorker.js', serviceWorkerParam: { scope: '/' + base } });
+        return OneSignal.init({ appId: CFG.ONESIGNAL_APP_ID, safari_web_id: CFG.ONESIGNAL_SAFARI_ID || undefined,
+          serviceWorkerPath: base + 'OneSignalSDKWorker.js', serviceWorkerParam: { scope: '/' + base } });
       });
     }
     window.OneSignalDeferred.push(function (OneSignal) { return OneSignal.login(S.sesion.correo); });
   }
+  function estadoNotificaciones() {
+    if (DEMO || !CFG.ONESIGNAL_APP_ID) return 'apagadas';
+    if (!('Notification' in window)) return ES_IOS && !navigator.standalone ? 'instalar' : 'nosoporta';
+    return Notification.permission === 'granted' ? 'activas' : Notification.permission === 'denied' ? 'bloqueadas' : 'pendiente';
+  }
   function pedirPermisoNotificaciones() {
     if (DEMO || !CFG.ONESIGNAL_APP_ID) { toast('Las notificaciones se activan cuando la app esté conectada.'); return; }
+    var est = estadoNotificaciones();
+    if (est === 'instalar') { toast('Primero instale la app en la pantalla de inicio y ábrala desde el ícono.'); return; }
+    if (est === 'nosoporta') { toast('Este navegador no permite notificaciones. Use la app instalada.'); return; }
+    if (est === 'bloqueadas') { toast('Las notificaciones están bloqueadas: actívelas en los ajustes del celular para esta app.'); return; }
+    var listo = function (ok) { toast(ok ? '✓ Listo, recibirá las alertas en este celular' : 'No se activaron las notificaciones'); render(); };
+    // En iPhone el permiso hay que pedirlo en el mismo toque: si el SDK ya cargó, se pide directo
+    if (window.OneSignal && window.OneSignal.Notifications) {
+      window.OneSignal.Notifications.requestPermission().then(function () { listo(Notification.permission === 'granted'); }, function () { listo(false); });
+      return;
+    }
     iniciarNotificaciones();
     window.OneSignalDeferred.push(function (OneSignal) {
-      return OneSignal.Notifications.requestPermission().then(function () { toast('Listo, recibirá las alertas en este celular.'); });
+      return OneSignal.Notifications.requestPermission().then(function () { listo(Notification.permission === 'granted'); });
     });
   }
 
@@ -1232,7 +1248,12 @@
       '<div class="dato"><span class="l">Sesión</span><span class="v">' + esc(S.sesion.nombre || '') + '<br><small style="font-weight:400;color:var(--suave)">' + esc(S.sesion.correo) + '</small></span></div>' +
       '<div class="dato"><span class="l">Bloqueo con ' + nombreBiometria() + ' / PIN' + (b ? '<br><small>' + (b.cred ? nombreBiometria() + ' y PIN activos' : 'Solo PIN') + '</small>' : '') + '</span><span class="v">' + (b ? '<button class="btn chico rojo" id="bloq-off">Quitar</button>' : '<button class="btn chico" id="bloq-on">Activar</button>') + '</span></div>' +
       (b && !b.cred && S.bioDisponible ? '<div class="dato"><span class="l">' + nombreBiometria() + '</span><span class="v"><button class="btn chico" id="bio-on">Activar ' + nombreBiometria() + '</button></span></div>' : '') +
-      '<div class="dato"><span class="l">Notificaciones</span><span class="v"><button class="btn chico sec" id="notif">Activar en este celular</button></span></div></div>' +
+      (function () {
+        var e = estadoNotificaciones();
+        var txt = { activas: '✓ Activas en este celular', bloqueadas: 'Bloqueadas en el celular', instalar: 'Instale la app primero', nosoporta: 'No disponibles aquí', apagadas: 'Sin configurar', pendiente: 'Apagadas' }[e];
+        return '<div class="dato"><span class="l">Notificaciones<br><small>' + txt + '</small></span><span class="v">' +
+          (e === 'activas' ? '<button class="btn chico sec" id="notif-prueba">Enviar prueba</button>' : '<button class="btn chico" id="notif">Activar en este celular</button>') + '</span></div></div>';
+      })() +
       '<button class="btn sec" id="salir" style="margin-top:16px">Cerrar sesión</button>' +
       (DEMO ? '<button class="btn rojo" id="reiniciar" style="margin-top:10px">Reiniciar datos de demostración</button>' : '') +
       '<p class="nota" style="text-align:center">App IPTV · versión ' + (window.APP_VERSION || LOGICA_VERSION) + (DEMO ? ' · modo demostración' : '') + '</p>';
@@ -1648,7 +1669,10 @@
       if ($('bloq-off')) $('bloq-off').onclick = function () {
         confirmarIdentidad().then(function () { localStorage.removeItem('iptv_bloqueo'); toast('Bloqueo quitado'); render(); }, function () { });
       };
-      $('notif').onclick = pedirPermisoNotificaciones;
+      if ($('notif')) $('notif').onclick = pedirPermisoNotificaciones;
+      if ($('notif-prueba')) $('notif-prueba').onclick = function () {
+        guardando(this, api('probarNotificacion')).then(function (r) { toast(r && r.ok ? 'Prueba enviada. Debe llegar en unos segundos.' : 'No se pudo: ' + (r && r.error || '')); });
+      };
       $('salir').onclick = function () { localStorage.removeItem('iptv_bloqueo'); cerrarSesion(); };
       if ($('reiniciar')) $('reiniciar').onclick = function () {
         localStorage.removeItem('iptv_demo_db'); demoDb = null; S.datos = null; toast('Datos de demostración reiniciados'); ir('#/inicio'); render();

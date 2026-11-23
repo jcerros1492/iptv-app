@@ -12,5 +12,6 @@ window.APP_CONFIG = {
   // ID de cliente de Google (termina en .apps.googleusercontent.com)
   GOOGLE_CLIENT_ID: '803845879519-ptj8kbuh4t72gesbrp084ompk9lc8lgp.apps.googleusercontent.com',
   // ID de la app de OneSignal para notificaciones (opcional)
-  ONESIGNAL_APP_ID: ''
+  ONESIGNAL_APP_ID: '5c2da857-bbfc-4df1-81f6-9c3b70cf63a2',
+  ONESIGNAL_SAFARI_ID: 'web.onesignal.auto.504512c8-952a-4d80-9d02-48e16e3cc659'
 };

@@ -4,6 +4,12 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.8 · 23 nov 2026
+- Al tocar "Actualizar" en el aviso de versión nueva, la app se recarga sin volver a pedir
+  Face ID / huella (si ya estaba desbloqueada).
+- Incluye la 2.7.
+- Motor: no (si no instaló la 2.7, pegue el Codigo.gs de la 2.7).
+
 ## 2.7 · 23 nov 2026
 - Finanzas: "Últimos movimientos" y "Últimos cobros" se unieron en "Movimientos del sobre":
   entradas (cobros, pagos de deuda, aportes) en verde con "+" y salidas (gastos, créditos,

@@ -1,8 +1,7 @@
 {
-  "version": "2.7",
+  "version": "2.8",
   "fecha": "2026-11-23",
   "cambios": [
-    "Movimientos del sobre: entradas en verde y salidas en rojo",
-    "Ver todos los movimientos por mes"
+    "Al tocar Actualizar ya no pide Face ID otra vez"
   ]
 }

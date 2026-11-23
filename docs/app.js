@@ -1468,6 +1468,8 @@
       document.getElementById('av-x').onclick = function () { el.hidden = true; };
       document.getElementById('av-act').onclick = function () {
         this.disabled = true; this.textContent = 'Actualizando…';
+        // Si ya estaba desbloqueada, la recarga por actualización no vuelve a pedir Face ID (vale 1 minuto)
+        if (S.desbloqueado) { try { sessionStorage.setItem('iptv_recarga', String(Date.now() + 60000)); } catch (e) { } }
         var listo = function () { location.reload(); };
         var limpiar = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
         var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.update(); })); }) : Promise.resolve();
@@ -1498,6 +1500,11 @@
   biometriaDisponible().then(function (v) { S.bioDisponible = !!v; }, function () { });
   S.sesion = leerSesion();
   if (S.sesion && bloqueo()) S.desbloqueado = false; else if (S.sesion) S.desbloqueado = true;
+  try {
+    var pase = Number(sessionStorage.getItem('iptv_recarga') || 0);
+    sessionStorage.removeItem('iptv_recarga');
+    if (S.sesion && pase > Date.now()) { S.desbloqueado = true; marcarActividad(); }
+  } catch (e) { }
   iniciarNotificaciones();
   render();
   avisarSiSeActualizo();

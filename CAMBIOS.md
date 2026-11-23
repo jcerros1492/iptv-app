@@ -4,6 +4,11 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 2.9 · 23 nov 2026
+- La app tiene su propio identificador ("id": "/iptv-app/"), para que Android no la confunda
+  con otras apps web publicadas en la misma cuenta de GitHub.
+- Motor: no.
+
 ## 2.8 · 23 nov 2026
 - Al tocar "Actualizar" en el aviso de versión nueva, la app se recarga sin volver a pedir
   Face ID / huella (si ya estaba desbloqueada).

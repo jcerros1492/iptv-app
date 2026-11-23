@@ -157,7 +157,7 @@ function tareaManana() {
 
   // 3. Aviso del pago de Adobe
   if (config.adobe_proximo && diasEntre(hoy, config.adobe_proximo) === 0) {
-    notificar_('Gasto fijo', 'Hoy toca el pago de Adobe (aprox. ' + colones(numero(config.adobe_monto)) + '). Confírmenlo en la app.', '#/finanzas');
+    notificar_('Gasto fijo', 'Hoy toca el pago de Adobe: ' + textoAdobe(config, tipoCambioActual_(db, config)) + '. Regístrelo en la app con el monto que cobró el banco.', '#/gasto/adobe');
   }
 }
 

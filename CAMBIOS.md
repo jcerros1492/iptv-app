@@ -4,6 +4,18 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.0 · 23 nov 2026
+- Tema oscuro: Ajustes → Apariencia → Automático (sigue al celular), Claro u Oscuro.
+- Nuevo: Registrar gasto (Finanzas → "+ Gasto", o tocando la alerta de Adobe).
+  · Adobe: se guarda en dólares ($19.99, clave "adobe_usd" en Config). La app propone el monto
+    en colones con el cambio del día; se escribe lo que de verdad cobró el banco. La fecha del
+    próximo pago se corre sola 2 meses.
+  · Otro gasto: descripción y monto libres.
+- La alerta y la notificación de Adobe dicen "$19.99 ≈ ₡9.079 con el cambio de hoy".
+- Los montos se leen bien con punto o coma decimal (9095,45 · 9095.45 · 9.095,45), también en
+  el cuadre del sobre y el tipo de cambio.
+- Motor: SÍ → copiar Codigo.gs, Logica.gs y Tareas.gs a Apps Script y hacer Nueva versión.
+
 ## 2.9 · 23 nov 2026
 - La app tiene su propio identificador ("id": "/iptv-app/"), para que Android no la confunda
   con otras apps web publicadas en la misma cuenta de GitHub.

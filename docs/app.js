@@ -42,6 +42,18 @@
     clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('ver'); }, 2600);
   }
   function ir(ruta) { location.hash = ruta; }
+  /**
+   * Lee un monto escrito por la persona: acepta 9095,45 · 9095.45 · 9.095,45 · 9,095.45 · 176762.92 · ₡20.880
+   * Regla: el último punto o coma seguido de 1 o 2 cifras es decimal; los demás son de miles.
+   */
+  function leerMonto(v) {
+    if (typeof v === 'number') return v;
+    var t = String(v || '').replace(/[^\d.,-]/g, '');
+    if (!t) return 0;
+    var m = t.match(/^(-?[\d.,]*?)[.,](\d{1,2})$/);
+    var n = m ? parseFloat(m[1].replace(/[.,]/g, '') + '.' + m[2]) : parseFloat(t.replace(/[.,]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
   function plural(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
   function disp(n) { return plural(Number(n), 'dispositivo', 'dispositivos'); }
   var ICON = {
@@ -102,7 +114,7 @@
             if (accion === 'tipoCambioManual') {
               db.tipocambio.push({ Fecha: hoy, Venta: numero(datos.venta), Fuente: 'Manual' }); guardarDemo(); return ok({ ok: true });
             }
-            var fn = { guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
+            var fn = { guardarCobro: accionGuardarCobro, pagarDeuda: accionPagarDeuda, reactivar: accionReactivar, guardarGasto: accionGuardarGasto, guardarCliente: accionGuardarCliente, respuesta: accionRespuesta, guardarControl: accionGuardarControl }[accion];
             if (!fn) throw new Error('Acción desconocida');
             r = fn(db, config, datos, hoy, correo, tc);
             aplicarCambiosEnMemoria(db, r.cambios); guardarDemo();
@@ -422,7 +434,7 @@
     return barra('Alertas', '#/inicio') + '<p class="nota" style="margin:0 0 10px">Cosas que revisar en el negocio</p>' +
       (a.length ? '<div class="card">' + a.map(function (x) {
         var href = x.usuario ? ((x.tipo === 'Vencido' || x.tipo === 'Por vencer') ? '#/mensaje/' : x.tipo === 'Cobro' ? '#/deuda/' : '#/cliente/') + encodeURIComponent(x.usuario) :
-          (x.tipo === 'Gasto fijo' || x.tipo === 'Créditos' || x.tipo === 'Depósito') ? '#/finanzas' : '#/inicio';
+          x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : (x.tipo === 'Créditos' || x.tipo === 'Depósito') ? '#/finanzas' : '#/inicio';
         return '<a class="fila" href="' + href + '"><span class="punto ' + x.nivel + '"></span><span class="txt"><span class="t2" style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;font-size:11px">' +
           esc(x.tipo) + '</span><span class="t1">' + esc(x.titulo) + '</span><span class="t2">' + esc(x.detalle) + '</span></span></a>';
       }).join('') + '</div>' : '<div class="card"><div class="vacio">Todo en orden. No hay alertas.</div></div>');
@@ -765,7 +777,7 @@
     S.datos.cobros.forEach(function (x) { if (x.Fecha >= hace30 && x.Estado !== 'Incobrable') uso30 += numero(x['Créditos']); });
     var alcanza = uso30 > 0 ? Math.floor(r.creditos / uso30) : null;
     var todoCuadra = ctrl && cuadraS && cuadraC;
-    return banner() + '<div class="top"><h1>Finanzas</h1><a class="btn chico" href="#/reportes">Reportes</a></div>' +
+    return banner() + '<div class="top"><h1>Finanzas</h1><div style="display:flex;gap:8px"><a class="btn chico sec" href="#/gasto/otro">+ Gasto</a><a class="btn chico" href="#/reportes">Reportes</a></div></div>' +
       '<div class="tiles" style="grid-template-columns:repeat(2,1fr)">' +
       '<div class="tile" style="padding:16px"><span>Créditos disponibles</span><b style="font-size:44px;line-height:1.05;margin-top:4px;color:' + (r.creditos < 30 ? 'var(--rojo-txt)' : 'var(--texto)') + '">' + r.creditos + '</b>' +
         '<span style="font-size:12px;margin-top:4px">' + (uso30 ? uso30 + ' usados en 30 días' + (alcanza !== null ? ' · alcanzan ~' + plural(alcanza, 'mes', 'meses') : '') : '') + '</span></div>' +
@@ -836,6 +848,26 @@
       '<div class="card pad" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>Diferencia en ' + esc(rg.nombre) + '</span><b style="font-size:18px;color:' + (entradas + salidas >= 0 ? 'var(--verde-txt)' : 'var(--rojo-txt)') + '">' + (entradas + salidas >= 0 ? '+' : '−') + colones(Math.abs(entradas + salidas)) + '</b></div>' +
       (M.filtro !== 'todos' ? '<p class="nota">Mostrando solo ' + M.filtro + '. <a href="#" id="mfil-x" style="color:var(--texto)">Ver todo</a></p>' : '') +
       '<div class="card" style="margin-top:10px">' + (lista.length ? lista.map(filaMov).join('') : '<div class="vacio">Sin movimientos en ' + esc(rg.nombre) + '</div>') + '</div>';
+  }
+
+  /* --- Registrar gasto --- */
+  function pGasto(arg) {
+    var c = S.datos.config, tc = S.datos.tipoCambio;
+    if (!S.gasto || (arg && S.gasto.desde !== arg)) S.gasto = { desde: arg || '', tipo: arg === 'adobe' ? 'adobe' : (arg === 'otro' ? 'otro' : 'adobe'), fecha: S.datos.hoy, monto: null, descripcion: '', afectaSobre: true };
+    var g = S.gasto, usd = numero(c.adobe_usd) || 19.99, estimado = Math.round(usd * tc);
+    var monto = g.monto != null ? g.monto : (g.tipo === 'adobe' ? estimado : '');
+    return barra('Registrar gasto', '#/finanzas', 'cerrar') +
+      '<div class="opciones c2"><button class="op' + (g.tipo === 'adobe' ? ' sel' : '') + '" data-gtipo="adobe">Adobe</button><button class="op' + (g.tipo === 'otro' ? ' sel' : '') + '" data-gtipo="otro">Otro gasto</button></div>' +
+      (g.tipo === 'adobe' ?
+        '<div class="card pad" style="margin-top:12px"><div class="dato" style="border:0;padding:0"><span class="l">Adobe cobra</span><span class="v">$' + usd + '</span></div>' +
+        '<div class="dato" style="border:0;padding:6px 0 0"><span class="l">Con el cambio de hoy (' + colones(tc) + ')</span><span class="v">≈ ' + colones(estimado) + '</span></div>' +
+        '<div class="dato" style="border:0;padding:6px 0 0"><span class="l">Próximo pago</span><span class="v">' + (c.adobe_proximo ? fechaCorta(c.adobe_proximo) : '—') + '</span></div></div>' +
+        '<p class="nota">Escriba lo que <b>de verdad</b> cobró el banco (está en el estado de la tarjeta). Así el sobre queda exacto.</p>'
+        : '<div class="etq">¿En qué fue?</div><input id="g-desc" class="input" type="text" placeholder="Ej.: curso, comisión, otro servicio" value="' + esc(g.descripcion) + '">') +
+      '<div class="etq">Monto en colones</div><input id="g-monto" class="input" type="text" inputmode="decimal" value="' + (monto === '' ? '' : numero(monto)) + '" placeholder="₡">' +
+      '<div class="etq">Fecha del cobro</div><input id="g-fecha" class="input" type="date" value="' + esc(g.fecha) + '">' +
+      '<label class="check" style="margin-top:10px"><input type="checkbox" id="g-sobre"' + (g.afectaSobre ? ' checked' : '') + '>Sale del sobre BCR</label>' +
+      '<button class="btn" id="g-ok" style="margin-top:10px">Guardar gasto</button>';
   }
 
   /* --- Reportes --- */
@@ -1096,6 +1128,16 @@
     var p = String(f).split('-'); return p.length === 3 ? 'Mes de ' + m[Number(p[1]) - 1] : esc(f);
   }
 
+  /* --- Tema claro / oscuro --- */
+  function temaElegido() { try { return localStorage.getItem('iptv_tema') || 'auto'; } catch (e) { return 'auto'; } }
+  function aplicarTema() {
+    var t = temaElegido();
+    var osc = t === 'oscuro' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('oscuro', !!osc);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', osc ? '#0F0E0D' : '#FAFAF9');
+  }
+  if (window.matchMedia) { try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarTema); } catch (e) { } }
+
   /* --- Ajustes --- */
   function pAjustes() {
     var b = bloqueo(), c = S.datos.config;
@@ -1104,8 +1146,11 @@
       '<div class="dato"><span class="l">Precios por dispositivo</span><span class="v">$' + [c.precios[1], c.precios[2], c.precios[3], c.precios[5]].join(' · $') + '</span></div>' +
       '<div class="dato"><span class="l">Tipo de cambio de hoy</span><span class="v"><button class="btn chico sec" id="tc2">' + colones(S.datos.tipoCambio) + ' ' + ico('lapiz', '') + '</button></span></div>' +
       '<div class="dato"><span class="l">Margen si pagan de menos</span><span class="v">' + colones(c.tolerancia) + '</span></div>' +
-      '<div class="dato"><span class="l">Próximo pago de Adobe</span><span class="v">' + fechaCorta(c.adobe_proximo) + '</span></div></div>' +
+      '<div class="dato"><span class="l">Adobe</span><span class="v">$' + (numero(c.adobe_usd) || 19.99) + ' cada ' + (numero(c.adobe_cada_meses) || 2) + ' meses<br><small style="font-weight:400;color:var(--suave)">próximo ' + fechaCorta(c.adobe_proximo) + '</small></span></div></div>' +
       '<p class="nota">Los precios y montos se cambian en la pestaña Config de la hoja de Google.</p>' +
+      '<div class="etq">Apariencia</div><div class="opciones c3">' + [['auto', 'Automático'], ['claro', 'Claro'], ['oscuro', 'Oscuro']].map(function (t) {
+        return '<button class="op' + (temaElegido() === t[0] ? ' sel' : '') + '" data-tema="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div><p class="nota">Automático sigue el modo claro u oscuro del celular.</p>' +
       '<div class="etq">Este celular</div><div class="card">' +
       '<div class="dato"><span class="l">Sesión</span><span class="v">' + esc(S.sesion.nombre || '') + '<br><small style="font-weight:400;color:var(--suave)">' + esc(S.sesion.correo) + '</small></span></div>' +
       '<div class="dato"><span class="l">Bloqueo con ' + nombreBiometria() + ' / PIN' + (b ? '<br><small>' + (b.cred ? nombreBiometria() + ' y PIN activos' : 'Solo PIN') + '</small>' : '') + '</span><span class="v">' + (b ? '<button class="btn chico rojo" id="bloq-off">Quitar</button>' : '<button class="btn chico" id="bloq-on">Activar</button>') + '</span></div>' +
@@ -1122,7 +1167,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -1165,7 +1210,7 @@
   function editarTipoCambio(paraTodoElDia) {
     var v = window.prompt('Tipo de cambio de venta del BCR (por ejemplo 458,50):', String(S.cobro ? S.cobro.tipoCambio : S.datos.tipoCambio).replace('.', ','));
     if (!v) return;
-    var n = numero(v.indexOf(',') >= 0 ? v : v.replace('.', ','));
+    var n = leerMonto(v);
     if (!(n > 300 && n < 1000)) { toast('Monto no válido'); return; }
     var todoDia = paraTodoElDia || window.confirm('¿Usar ' + colones(n) + ' para todo el día?\nAceptar: todo el día · Cancelar: solo este cobro');
     if (S.cobro) { S.cobro.tipoCambio = n; S.cobro.monto = null; }
@@ -1272,7 +1317,7 @@
       todos('[data-mes]', function (x) { x.onclick = function () { b.meses = Number(x.dataset.mes); b.monto = null; render(); }; });
       todos('[data-forma]', function (x) { x.onclick = function () { b.forma = x.dataset.forma; render(); }; });
       todos('[data-estado]', function (x) { x.onclick = function () { b.estado = x.dataset.estado; render(); }; });
-      $('monto').onchange = function () { b.monto = numero(this.value); render(); };
+      $('monto').onchange = function () { b.monto = leerMonto(this.value); render(); };
       $('monto').onfocus = function () { this.select(); };
       $('en-panel').onchange = function () { b.enPanel = this.checked; };
       $('en-sobre').onchange = function () { b.enSobre = this.checked; };
@@ -1338,13 +1383,32 @@
       $('control').onclick = function () {
         var s = window.prompt('¿Cuánto hay hoy en el sobre del BCR? (colones)'); if (!s) return;
         var c = window.prompt('¿Cuántos créditos muestra hoy el panel de XtreamAI?'); if (!c) return;
-        api('guardarControl', { sobreReal: numero(s), creditosPanel: numero(c) }).then(refrescar).then(function () { toast('Control guardado'); render(); }, function (e) { toast(e.message); });
+        api('guardarControl', { sobreReal: leerMonto(s), creditosPanel: Math.round(leerMonto(c)) }).then(refrescar).then(function () { toast('Control guardado'); render(); }, function (e) { toast(e.message); });
       };
     }
     if ($('sync')) $('sync').onclick = function () {
       refrescar().then(function () { render(); toast('Datos actualizados'); }, function (e) { toast(e.message); });
     };
     if (ruta === 'finanzas' && !S.repBase && !DEMO) cargarBaseReportes();
+    if (ruta === 'gasto') {
+      var leer = function () { S.gasto.monto = $('g-monto').value === '' ? null : leerMonto($('g-monto').value); S.gasto.fecha = $('g-fecha').value || S.datos.hoy; if ($('g-desc')) S.gasto.descripcion = $('g-desc').value; };
+      todos('[data-gtipo]', function (x) { x.onclick = function () { leer(); S.gasto.tipo = x.dataset.gtipo; S.gasto.monto = null; render(); }; });
+      $('g-sobre').onchange = function () { S.gasto.afectaSobre = this.checked; };
+      $('g-ok').onclick = function () {
+        leer(); var g = S.gasto;
+        var m = leerMonto($('g-monto').value);
+        if (!(m > 0)) { toast('Escriba el monto en colones'); return; }
+        if (g.tipo === 'otro' && !String(g.descripcion).trim()) { toast('Escriba en qué fue el gasto'); return; }
+        if (!window.confirm('¿Guardar gasto de ' + colones(m) + (g.tipo === 'adobe' ? ' (Adobe)' : ' (' + g.descripcion + ')') + '?')) return;
+        guardando(this, api('guardarGasto', { tipo: g.tipo, fecha: g.fecha, monto: m, descripcion: g.descripcion, afectaSobre: g.afectaSobre })).then(function (r) {
+          return refrescar().then(function () {
+            S.gasto = null;
+            toast(r.proximo ? 'Adobe guardado. Próximo pago: ' + fechaCorta(r.proximo) : 'Gasto guardado');
+            ir('#/finanzas');
+          });
+        });
+      };
+    }
     if (ruta === 'movimientos') {
       todos('[data-mper]', function (x) { x.onclick = function () { S.movs.periodo = x.dataset.mper; render(); }; });
       todos('[data-mfil]', function (x) { x.onclick = function () { S.movs.filtro = S.movs.filtro === x.dataset.mfil ? 'todos' : x.dataset.mfil; render(); }; });
@@ -1408,7 +1472,7 @@
       todos('[data-copiar-p]', function (x) { x.onclick = function () { var v = S.listaPw && S.listaPw.v[x.dataset.copiarP]; if (v) copiarTexto(v).then(function () { toast('Contraseña copiada'); }, function () { toast('No se pudo copiar'); }); }; });
     }
     if (ruta === 'deuda' && $('deuda-ok')) {
-      todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = numero($('deuda-monto').value); render(); }; });
+      todos('[data-dforma]', function (x) { x.onclick = function () { S.deuda.forma = x.dataset.dforma; S.deuda.monto = leerMonto($('deuda-monto').value); render(); }; });
       todos('[data-deuda]', function (x) {
         x.onchange = function () {
           var id = x.dataset.deuda, i = S.deuda.ids.indexOf(id);
@@ -1418,10 +1482,10 @@
           render();
         };
       });
-      $('deuda-monto').oninput = function () { S.deuda.monto = numero(this.value); };
+      $('deuda-monto').oninput = function () { S.deuda.monto = leerMonto(this.value); };
       $('deuda-sobre').onchange = function () { S.deuda.enSobre = this.checked; };
       $('deuda-ok').onclick = function () {
-        var m = numero($('deuda-monto').value);
+        var m = leerMonto($('deuda-monto').value);
         if (!(m > 0)) { toast('Escriba el monto que pagó'); return; }
         guardando(this, api('pagarDeuda', { usuario: arg, ids: S.deuda.ids, monto: m, forma: S.deuda.forma, enSobre: S.deuda.enSobre })).then(function (r) {
           return refrescar().then(function () {
@@ -1434,6 +1498,7 @@
     }
     if (ruta === 'ajustes') {
       $('tc2').onclick = function () { S.cobro = null; editarTipoCambio(true); };
+      todos('[data-tema]', function (x) { x.onclick = function () { try { localStorage.setItem('iptv_tema', x.dataset.tema); } catch (e) { } aplicarTema(); render(); }; });
       if ($('bloq-on')) $('bloq-on').onclick = function () {
         activarBloqueo().then(function (b) { toast(b.cred ? nombreBiometria() + ' y PIN activados' : 'PIN activado'); render(); }, function () { });
       };

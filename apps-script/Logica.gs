@@ -91,6 +91,7 @@ var CONFIG_POR_DEFECTO = {
   ultimo_comprobante: 0,
   adobe_proximo: '2027-01-18',
   adobe_monto: 9155.42,
+  adobe_usd: 19.99,
   adobe_cada_meses: 2
 };
 
@@ -295,7 +296,7 @@ function resumen(db, config, tipoCambio) {
 
 /* ---------------- Alertas ---------------- */
 
-function alertas(db, config, hoy, lista) {
+function alertas(db, config, hoy, lista, tipoCambio) {
   var out = [];
   lista = lista || prepararClientes(db, hoy);
   lista.forEach(function (c) {
@@ -333,7 +334,7 @@ function alertas(db, config, hoy, lista) {
   if (config.adobe_proximo) {
     var d = diasEntre(hoy, config.adobe_proximo);
     if (d <= 3) out.push({ tipo: 'Gasto fijo', nivel: 'azul', titulo: 'Pago de Adobe ' + (d < 0 ? 'atrasado' : d === 0 ? 'hoy' : 'en ' + d + ' días'),
-      detalle: 'Aprox. ' + colones(numero(config.adobe_monto)) });
+      detalle: textoAdobe(config, tipoCambio) + ' · toque para registrarlo' });
   }
   var orden = { rojo: 0, naranja: 1, azul: 2 };
   return out.sort(function (a, b) { return orden[a.nivel] - orden[b.nivel]; });
@@ -533,6 +534,42 @@ function accionReactivar(db, config, p, hoy, correo) {
   ] };
 }
 
+/** "$19.99 ≈ ₡9.080" con el tipo de cambio del día (o el último monto si no hay dólares). */
+function textoAdobe(config, tipoCambio) {
+  var usd = numero(config.adobe_usd), tc = numero(tipoCambio) || numero(config.tipo_cambio_respaldo);
+  if (usd && tc) return '$' + usd + ' ≈ ' + colones(Math.round(usd * tc)) + ' con el cambio de hoy';
+  return 'Aprox. ' + colones(numero(config.adobe_monto));
+}
+
+/**
+ * Registrar un gasto. Si es Adobe, además guarda el monto real y corre la fecha del próximo pago.
+ * p: { tipo: 'adobe' | 'otro', fecha, monto (colones, positivo), descripcion, nota, afectaSobre }
+ */
+function accionGuardarGasto(db, config, p, hoy, correo) {
+  var monto = numero(p.monto);
+  if (!(monto > 0)) throw new Error('Escriba el monto en colones.');
+  var fecha = p.fecha || hoy, adobe = p.tipo === 'adobe';
+  if (!adobe && !String(p.descripcion || '').trim()) throw new Error('Escriba en qué fue el gasto.');
+  var socio = nombreSocio(config, correo);
+  var cambios = [{ tabla: 'Movimientos', op: 'agregar', fila: {
+    ID: nuevoId_('M', fecha, db.movimientos), Fecha: fecha,
+    Tipo: adobe ? 'Gasto fijo (Adobe)' : (p.categoria || 'Gasto'),
+    'Descripción': adobe ? 'COMPRA ADOBE' : String(p.descripcion).trim(),
+    Monto: -Math.round(monto * 100) / 100, 'Créditos': 0,
+    'Afecta sobre': p.afectaSobre === false ? 'No' : 'Sí', 'Registró': socio, Nota: p.nota || ''
+  } }];
+  var resultado = { ok: true };
+  if (adobe) {
+    var cada = numero(config.adobe_cada_meses) || 2, prox = config.adobe_proximo || fecha;
+    // Correr la fecha hasta que quede después de este pago (con margen de 15 días)
+    while (diasEntre(fecha, prox) <= 15) prox = sumarMeses(prox, cada);
+    cambios.push({ tabla: 'Config', op: 'actualizar', clave: 'Clave', valor: 'adobe_monto', fila: { Valor: Math.round(monto * 100) / 100 } });
+    cambios.push({ tabla: 'Config', op: 'actualizar', clave: 'Clave', valor: 'adobe_proximo', fila: { Valor: prox } });
+    resultado.proximo = prox;
+  }
+  return { resultado: resultado, cambios: cambios };
+}
+
 function accionGuardarControl(db, config, p, hoy, correo) {
   return { resultado: { ok: true }, cambios: [
     { tabla: 'Controles', op: 'agregar', fila: { Fecha: hoy, 'Sobre real': numero(p.sobreReal), 'Créditos panel': numero(p.creditosPanel), 'Registró': nombreSocio(config, correo) } }
@@ -566,12 +603,12 @@ function armarEstado(db, config, hoy, correo, tipoCambio) {
       regalias: { 3: config.regalia_3, 6: config.regalia_6, 12: config.regalia_12 },
       telefono_jonathan: config.telefono_jonathan, telefono_fernando: config.telefono_fernando,
       adobe_proximo: config.adobe_proximo, adobe_monto: config.adobe_monto, tipo_cambio_respaldo: config.tipo_cambio_respaldo,
-      dias_reaviso: config.dias_reaviso
+      dias_reaviso: config.dias_reaviso, adobe_usd: config.adobe_usd, adobe_cada_meses: config.adobe_cada_meses
     },
     tipoCambio: numero(tipoCambio) || numero(config.tipo_cambio_respaldo),
     clientes: lista,
     resumen: resumen(db, config, tipoCambio),
-    alertas: alertas(db, config, hoy, lista),
+    alertas: alertas(db, config, hoy, lista, tipoCambio),
     cobros: cobros.slice(0, 400).map(function (c) {
       var o = {}; for (var k in c) if (k.charAt(0) !== '_') o[k] = c[k]; return o;
     }),
@@ -668,7 +705,7 @@ function aplicarCambiosEnMemoria(db, cambios) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { reporte: reporte,
+  module.exports = { reporte: reporte, accionGuardarGasto: accionGuardarGasto, textoAdobe: textoAdobe,
     sumarMeses: sumarMeses, sumarDias: sumarDias, diasEntre: diasEntre, fechaCorta: fechaCorta,
     redondear: redondear, colones: colones, numero: numero, leerConfig: leerConfig, CONFIG_POR_DEFECTO: CONFIG_POR_DEFECTO,
     calcularCobro: calcularCobro, evaluarPago: evaluarPago, resumen: resumen, alertas: alertas,

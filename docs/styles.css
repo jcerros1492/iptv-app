@@ -156,3 +156,26 @@ button, a, .btn, .faceid { touch-action: manipulation; -webkit-tap-highlight-col
   .card { break-inside: avoid; box-shadow: none; }
 }
 details > summary::-webkit-details-marker { display: none; }
+
+/* ---------- Tema oscuro (Ajustes → Tema) ---------- */
+html.oscuro {
+  --bg: #0F0E0D; --card: #1C1A19; --borde: #2E2B29; --linea: #282523;
+  --texto: #F5F5F4; --suave: #A8A29E; --medio: #D6D3D1; --tenue: #78716C;
+  --rojo: #EF4444; --rojo-txt: #F87171; --rojo-bg: #3A1515;
+  --beige: #2A2418; --beige-txt: #E6C98A; --naranja-bg: #33200F; --naranja-txt: #FDBA74;
+  --verde: #22C55E; --verde-bg: #11291A; --verde-txt: #4ADE80; --gris-bg: #262321;
+  color-scheme: dark;
+}
+html.oscuro .btn, html.oscuro .filtro.sel, html.oscuro .logo, html.oscuro .aviso-version { color: #0F0E0D; }
+html.oscuro .btn.sec { color: var(--texto); }
+html.oscuro .btn.verde { color: #fff; }
+html.oscuro .tile.rojo { border-color: #5A2020; }
+html.oscuro .aviso { color: #FED7AA; }
+html.oscuro .seg { background: #262321; }
+html.oscuro .seg button.sel { background: #3A3633; color: #F5F5F4; }
+html.oscuro .buscar { border-color: #57534E; }
+html.oscuro .toast { background: #F5F5F4; color: #0F0E0D; }
+html.oscuro .aviso-version button { background: #0F0E0D; color: #F5F5F4; }
+html.oscuro .aviso-version .cerrar { background: transparent; color: #0F0E0D; }
+html.oscuro input, html.oscuro select, html.oscuro textarea, html.oscuro .input { background: #1C1A19; color: #F5F5F4; border-color: #3A3633; }
+html.oscuro .entrar.oscuro { background: #0F0E0D; }

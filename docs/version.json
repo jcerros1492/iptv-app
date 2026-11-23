@@ -1,7 +1,8 @@
 {
-  "version": "2.9",
+  "version": "3.0",
   "fecha": "2026-11-23",
   "cambios": [
-    "Identificador propio para instalarla en Android junto a otras apps"
+    "Tema oscuro",
+    "Registrar gastos (Adobe en dólares)"
   ]
 }

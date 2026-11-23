@@ -179,3 +179,13 @@ html.oscuro .aviso-version button { background: #0F0E0D; color: #F5F5F4; }
 html.oscuro .aviso-version .cerrar { background: transparent; color: #0F0E0D; }
 html.oscuro input, html.oscuro select, html.oscuro textarea, html.oscuro .input { background: #1C1A19; color: #F5F5F4; border-color: #3A3633; }
 html.oscuro .entrar.oscuro { background: #0F0E0D; }
+
+/* Pantallas chicas (iPhone SE, Android chicos): que nada se salga del ancho */
+.tiles > * { min-width: 0; }
+.tile b { overflow-wrap: anywhere; }
+@media (max-width: 360px) {
+  .tile b[style*="font-size:26px"] { font-size: 21px !important; }
+  .tile b[style*="font-size:44px"] { font-size: 38px !important; }
+  .top h1 { font-size: 28px; }
+  .btn.chico { padding-left: 12px; padding-right: 12px; }
+}

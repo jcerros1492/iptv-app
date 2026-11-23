@@ -4,6 +4,14 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.6 · 23 nov 2026
+- Revisadas todas las pantallas en iPhone SE (320), Android chico (360), Android (393),
+  iPhone Pro Max (430) y tablet (768), en tema claro y oscuro. Se corrigió Finanzas y el
+  Listado general, que se salían del ancho en pantallas chicas.
+- Android: el teclado numérico trae punto en vez de coma; ahora el punto que se escribe se toma
+  como céntimos (9095.45 → ₡9.095,45).
+- Motor: no (si no instaló la 3.5, pegue Codigo.gs, Logica.gs y Tareas.gs de la 3.5).
+
 ## 3.5 · 23 nov 2026
 - Nuevo: Reparto 50/50 con aprobación (Finanzas → "Para repartir" → "Proponer reparto").
   Uno propone el monto (máximo lo disponible, ya descontada la reserva de créditos) y el otro

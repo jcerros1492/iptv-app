@@ -1,7 +1,7 @@
 {
-  "version": "3.5",
+  "version": "3.6",
   "fecha": "2026-11-23",
   "cambios": [
-    "Reparto 50/50: uno propone y el otro aprueba"
+    "Ajustes para pantallas chicas y teclado de Android"
   ]
 }

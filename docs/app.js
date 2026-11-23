@@ -1145,9 +1145,9 @@
     var pw = S.listaPw && Date.now() < S.listaPw.hasta ? S.listaPw.v : null;
     return barra('Listado general', '#/clientes') +
       '<p class="nota" style="margin:0 0 10px">' + lista.length + ' clientes, en el orden en que les toca renovar.</p>' +
-      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
       '<button class="btn' + (pw ? ' sec' : '') + '" id="lista-pw" style="flex:1 1 0;width:auto;white-space:nowrap">' + (pw ? 'Ocultar contraseñas' : 'Mostrar contraseñas') + '</button>' +
-      '<button class="btn sec" id="lista-ex" style="flex:0 0 auto;width:auto;padding:0 16px;white-space:nowrap">' + (incluirEx ? 'Sin exclientes' : '+ Exclientes') + '</button></div>' +
+      '<button class="btn sec" id="lista-ex" style="flex:0 0 auto;width:auto;padding:0 12px;white-space:nowrap">' + (incluirEx ? 'Sin exclientes' : '+ Exclientes') + '</button></div>' +
       '<div class="card">' + lista.map(function (c) {
         var color = c.estado === 'Vencido' ? 'var(--rojo-txt)' : c.estado === 'Por vencer' ? '#9A5B00' : c.estado === 'Excliente' ? 'var(--suave)' : 'var(--medio)';
         var clave = pw ? (pw[c.usuario] || '—') : '••••••';
@@ -1470,13 +1470,21 @@
     // Campos de dinero: al salir del campo se escribe con separador de miles (₡20.880)
     todos('.campo-monto, #monto', function (x) {
       // Mientras se escribe: ₡1 → ₡10 → ₡100 → ₡1.000 → ₡10.000 (la coma es para céntimos)
-      x.addEventListener('input', function () {
-        var v = x.value, coma = v.lastIndexOf(',');
+      x.addEventListener('input', function (ev) {
+        var v = x.value;
+        // En Android el teclado trae "." en vez de ","; el punto que se acaba de escribir es para céntimos
+        if (ev && ev.data === '.') {
+          var pos = x.selectionStart || v.length;
+          if (v.charAt(pos - 1) === '.') v = v.slice(0, pos - 1) + ',' + v.slice(pos);
+          var dosComas = v.indexOf(',') !== v.lastIndexOf(',');
+          if (dosComas) v = v.slice(0, v.lastIndexOf(',')) + v.slice(v.lastIndexOf(',') + 1);
+        }
+        var coma = v.lastIndexOf(',');
         var ent = (coma >= 0 ? v.slice(0, coma) : v).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
         var dec = coma >= 0 ? v.slice(coma + 1).replace(/\D/g, '').slice(0, 2) : null;
         if (!ent && dec === null) { x.value = ''; return; }
         var nuevo = '₡' + (ent || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec !== null ? ',' + dec : '');
-        if (nuevo !== v) { x.value = nuevo; try { x.setSelectionRange(nuevo.length, nuevo.length); } catch (e) { } }
+        if (nuevo !== x.value) { x.value = nuevo; try { x.setSelectionRange(nuevo.length, nuevo.length); } catch (e) { } }
       });
       x.addEventListener('blur', function () { var n = leerMonto(x.value); if (x.value.trim() !== '') x.value = montoCampo(n); });
       x.addEventListener('focus', function () { setTimeout(function () { try { x.select(); } catch (e) { } }, 0); });

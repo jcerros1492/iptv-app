@@ -4,6 +4,14 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 4.0 · 24 nov 2026
+- Si se cierra con la ✕ el aviso de versión nueva, ya no vuelve a salir arriba: queda como
+  alerta en la campana ("Hay una versión nueva · toque para actualizar") y en Ajustes como botón
+  "Actualizar a la versión X". Cuando se actualiza, desaparece solo.
+- Ajustes: botón "Buscar actualización" para revisar en el momento.
+- Incluye la 3.9.
+- Motor: no (si no instaló la 3.9, pegue el Logica.gs de la 3.9).
+
 ## 3.9 · 24 nov 2026
 - Comprobante: la imagen ya no se corta abajo ("¡Gracias por su pago!" y los teléfonos se ven
   completos). El alto se ajusta solo a lo que lleva.

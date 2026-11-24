@@ -1,8 +1,7 @@
 {
-  "version": "3.9",
+  "version": "4.0",
   "fecha": "2026-11-24",
   "cambios": [
-    "Comprobante completo (ya no se corta)",
-    "Comprobante para abonos y pagos de deuda"
+    "Si cierra el aviso de actualización, queda en Alertas y Ajustes"
   ]
 }

@@ -454,8 +454,8 @@
       '<div class="top"><div><div class="fecha">' + esc(fechaLarga()) + '</div><h1>Inicio</h1>' +
       (DEMO ? '' : '<button id="sync" class="sync" aria-label="Actualizar ahora">' + esc(textoSync()) + '</button>') + '</div><div class="acciones-top">' +
       '<a class="icon-btn" href="#/ajustes" aria-label="Ajustes">' + ico('gear') + '</a>' +
-      '<a class="icon-btn" href="#/alertas" aria-label="Alertas: ' + d.alertas.length + '">' + ico('bell') +
-      (d.alertas.length ? '<span class="badge">' + d.alertas.length + '</span>' : '') + '</a></div></div>' +
+      '<a class="icon-btn" href="#/alertas" aria-label="Alertas: ' + alertasConVersion().length + '">' + ico('bell') +
+      (alertasConVersion().length ? '<span class="badge">' + alertasConVersion().length + '</span>' : '') + '</a></div></div>' +
       '<div class="tiles"><a class="tile" href="#/clientes"><span>Activos</span><b>' + (lista.length - nVenc) + '</b></a>' +
       '<a class="tile beige" href="#/clientes/porvencer"><span>Vencen en 30 días</span><b>' + nPor + '</b></a>' +
       '<a class="tile rojo" href="#/clientes/vencidos"><span>Vencidos</span><b>' + nVenc + '</b></a></div>' +
@@ -463,12 +463,19 @@
       '<div class="card">' + (lista.length ? lista.map(lineaCliente).join('') : '<div class="vacio">Sin clientes activos</div>') + '</div>';
   }
 
+  /** Alertas del negocio + el aviso de versión nueva (si se cerró el mensaje de arriba). */
+  function alertasConVersion() {
+    var a = S.datos.alertas.slice();
+    if (S.versionNueva) a.unshift({ tipo: 'Actualización', nivel: 'azul', titulo: 'Hay una versión nueva (' + S.versionNueva.version + ')',
+      detalle: (S.versionNueva.cambios || []).join(' · ') + ' · toque para actualizar' });
+    return a;
+  }
   function pAlertas() {
-    var a = S.datos.alertas;
+    var a = alertasConVersion();
     return barra('Alertas', '#/inicio') + '<p class="nota" style="margin:0 0 10px">Cosas que revisar en el negocio</p>' +
       (a.length ? '<div class="card">' + a.map(function (x) {
         var href = x.usuario ? ((x.tipo === 'Vencido' || x.tipo === 'Por vencer') ? '#/mensaje/' : x.tipo === 'Cobro' ? '#/deuda/' : '#/cliente/') + encodeURIComponent(x.usuario) :
-          x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : x.tipo === 'Depósito' ? '#/depositar' : x.tipo === 'Reparto' ? '#/reparto' : x.tipo === 'Créditos' ? '#/finanzas' : '#/inicio';
+          x.tipo === 'Actualización' ? '#/actualizar' : x.tipo === 'Gasto fijo' ? '#/gasto/adobe' : x.tipo === 'Depósito' ? '#/depositar' : x.tipo === 'Reparto' ? '#/reparto' : x.tipo === 'Créditos' ? '#/finanzas' : '#/inicio';
         return '<a class="fila" href="' + href + '"><span class="punto ' + x.nivel + '"></span><span class="txt"><span class="t2" style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;font-size:11px">' +
           esc(x.tipo) + '</span><span class="t1">' + esc(x.titulo) + '</span><span class="t2">' + esc(x.detalle) + '</span></span></a>';
       }).join('') + '</div>' : '<div class="card"><div class="vacio">Todo en orden. No hay alertas.</div></div>');
@@ -1285,6 +1292,8 @@
       })() +
       '<button class="btn sec" id="salir" style="margin-top:16px">Cerrar sesión</button>' +
       (DEMO ? '<button class="btn rojo" id="reiniciar" style="margin-top:10px">Reiniciar datos de demostración</button>' : '') +
+      (S.versionNueva ? '<a class="btn" href="#/actualizar" style="margin-top:12px">Actualizar a la versión ' + esc(S.versionNueva.version) + '</a>'
+        : '<button class="btn sec" id="buscar-act" style="margin-top:12px">Buscar actualización</button>') +
       '<p class="nota" style="text-align:center">App IPTV · versión ' + (window.APP_VERSION || LOGICA_VERSION) + (DEMO ? ' · modo demostración' : '') + '</p>';
   }
 
@@ -1294,7 +1303,7 @@
     inicio: { tab: 'inicio', fn: pInicio }, alertas: { tab: 'inicio', fn: pAlertas },
     clientes: { tab: 'clientes', fn: pClientes }, cliente: { tab: 'clientes', fn: pCliente },
     mensaje: { tab: 'clientes', fn: pMensaje }, cobro: { tab: 'cobro', fn: pCobro },
-    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, depositar: { tab: 'finanzas', fn: pDepositar }, reparto: { tab: 'finanzas', fn: pReparto }, nuevo: { tab: 'clientes', fn: pNuevo },
+    comprobante: { tab: 'cobro', fn: pComprobante }, deuda: { tab: 'clientes', fn: pDeuda }, promo: { tab: 'clientes', fn: pPromo }, lista: { tab: 'clientes', fn: pLista }, reportes: { tab: 'finanzas', fn: pReportes }, movimientos: { tab: 'finanzas', fn: pMovimientos }, gasto: { tab: 'finanzas', fn: pGasto }, depositar: { tab: 'finanzas', fn: pDepositar }, reparto: { tab: 'finanzas', fn: pReparto }, actualizar: { tab: 'inicio', fn: function () { setTimeout(actualizarAhora, 50); return '<div class="cargando">Actualizando la app…</div>'; } }, nuevo: { tab: 'clientes', fn: pNuevo },
     finanzas: { tab: 'finanzas', fn: pFinanzas }, ajustes: { tab: 'inicio', fn: pAjustes }
   };
 
@@ -1694,6 +1703,7 @@
     }
     if (ruta === 'ajustes') {
       $('tc2').onclick = function () { S.cobro = null; editarTipoCambio(true); };
+      if ($('buscar-act')) $('buscar-act').onclick = function () { toast('Buscando…'); revisarVersion(true); };
       todos('[data-tema]', function (x) { x.onclick = function () { try { localStorage.setItem('iptv_tema', x.dataset.tema); } catch (e) { } aplicarTema(); render(); }; });
       if ($('bloq-on')) $('bloq-on').onclick = function () {
         activarBloqueo().then(function (b) { toast(b.cred ? nombreBiometria() + ' y PIN activados' : 'PIN activado'); render(); }, function () { });
@@ -1720,26 +1730,32 @@
   /* ---------------- Aviso de versión nueva ---------------- */
 
   var VERSION_APP = window.APP_VERSION || '';
-  function revisarVersion() {
+  function revisarVersion(forzado) {
     if (!VERSION_APP || !window.fetch) return;
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (v) {
-      if (!v || !v.version || v.version === VERSION_APP) return;
+      if (!v || !v.version || v.version === VERSION_APP) { S.versionNueva = null; if (forzado) toast('✓ Ya tiene la última versión (' + VERSION_APP + ')'); return; }
+      var nueva = !S.versionNueva || S.versionNueva.version !== v.version;
+      S.versionNueva = v;
+      if (nueva && /^#\/(inicio|alertas)?$/.test(location.hash || '#/inicio')) render();
       var el = document.getElementById('aviso-version'); if (!el) return;
+      if (S.versionCerrada === v.version && !forzado) return;   // la cerró: queda en Alertas y Ajustes
       el.innerHTML = '<span class="txt"><b>Hay una versión nueva (' + esc(v.version) + ')</b>' +
         (v.cambios && v.cambios.length ? '<small>' + esc(v.cambios.join(' · ')) + '</small>' : '') + '</span>' +
         '<button id="av-act">Actualizar</button><button class="cerrar" id="av-x" aria-label="Cerrar">✕</button>';
       el.hidden = false;
-      document.getElementById('av-x').onclick = function () { el.hidden = true; };
+      document.getElementById('av-x').onclick = function () { el.hidden = true; S.versionCerrada = v.version; toast('Puede actualizar luego desde Alertas o Ajustes'); };
       document.getElementById('av-act').onclick = function () {
-        this.disabled = true; this.textContent = 'Actualizando…';
-        // Si ya estaba desbloqueada, la recarga por actualización no vuelve a pedir Face ID (vale 1 minuto)
-        if (S.desbloqueado) { try { sessionStorage.setItem('iptv_recarga', String(Date.now() + 60000)); } catch (e) { } }
-        var listo = function () { location.reload(); };
-        var limpiar = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
-        var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.update(); })); }) : Promise.resolve();
-        Promise.all([limpiar, sw]).then(listo, listo);
+        this.disabled = true; this.textContent = 'Actualizando…'; actualizarAhora();
       };
-    }, function () { });
+    }, function () { if (forzado) toast('No se pudo revisar. Revise su conexión.'); });
+  }
+  function actualizarAhora() {
+    // Si ya estaba desbloqueada, la recarga por actualización no vuelve a pedir Face ID (vale 1 minuto)
+    if (S.desbloqueado) { try { sessionStorage.setItem('iptv_recarga', String(Date.now() + 60000)); } catch (e) { } }
+    var listo = function () { location.reload(); };
+    var limpiar = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
+    var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.update(); })); }) : Promise.resolve();
+    Promise.all([limpiar, sw]).then(listo, listo);
   }
   function avisarSiSeActualizo() {
     if (!VERSION_APP) return;

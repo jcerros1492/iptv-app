@@ -4,6 +4,11 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.8 · 24 nov 2026
+- Finanzas: el monto del sobre (₡192.762,92) queda siempre en una sola línea; los céntimos se
+  ven más pequeños y el tamaño se ajusta al ancho de cada celular.
+- Motor: no.
+
 ## 3.7 · 23 nov 2026
 - Notificaciones al celular con OneSignal (App ID 5c2da857-…). Ajustes → Notificaciones →
   "Activar en este celular". Cuando están activas aparece "Enviar prueba".

@@ -53,6 +53,11 @@
     if (dec === 100) { ent++; dec = 0; }
     return (n < 0 ? '−' : '') + '₡' + String(ent).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + (dec < 10 ? '0' : '') + dec;
   }
+  /** Monto grande: los céntimos más pequeños, para que quepa en una sola línea (₡192.762,92) */
+  function montoGrande(n) {
+    var t = colonesDec(n), i = t.lastIndexOf(',');
+    return '<span>' + t.slice(0, i) + '</span><small>' + t.slice(i) + '</small>';
+  }
   /** Monto para escribir en un campo: ₡20.880 o ₡9.095,45 (con céntimos si los tiene). */
   function montoCampo(n) {
     n = Math.round(numero(n) * 100) / 100;
@@ -810,7 +815,7 @@
       '<div class="tiles" style="grid-template-columns:repeat(2,1fr)">' +
       '<div class="tile" style="padding:16px"><span>Créditos disponibles</span><b style="font-size:44px;line-height:1.05;margin-top:4px;color:' + (r.creditos < 30 ? 'var(--rojo-txt)' : 'var(--texto)') + '">' + r.creditos + '</b>' +
         '<span style="font-size:12px;margin-top:4px">' + (uso30 ? uso30 + ' usados en 30 días' + (alcanza !== null ? ' · alcanzan ~' + plural(alcanza, 'mes', 'meses') : '') : '') + '</span></div>' +
-      '<div class="tile" style="padding:16px"><span>En el sobre BCR</span><b style="font-size:26px;line-height:1.15;margin-top:10px">' + colonesDec(r.sobreEnBanco) + '</b>' +
+      '<div class="tile" style="padding:16px"><span>En el sobre BCR</span><b class="monto-grande">' + montoGrande(r.sobreEnBanco) + '</b>' +
         (r.sinDepositar ? '<a href="#/depositar" style="font-size:12px;margin-top:4px;color:var(--naranja-txt);font-weight:600">' + colonesDec(r.sinDepositar) + ' sin depositar ›</a>' : '<span style="font-size:12px;margin-top:4px">Todo depositado</span>') + '</div></div>' +
       (r.creditos < 30 ? '<div class="aviso" style="margin-top:10px">' + ico('alerta') + '<div><b>Quedan pocos créditos</b>Conviene comprar más al proveedor.</div></div>' : '') +
       '<details class="card pad" style="margin-top:10px"' + (ctrl && !todoCuadra ? ' open' : '') + '><summary style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none">' +
@@ -889,7 +894,7 @@
       var mio = rp.propone === yo;
       h += '<div class="card pad" style="text-align:center;padding:22px 16px">' +
         '<div class="nota" style="margin:0">' + esc(rp.propone) + ' propuso el ' + fechaCorta(rp.fecha) + '</div>' +
-        '<div style="font-size:34px;font-weight:800;margin:6px 0">' + colonesDec(rp.monto) + '</div>' +
+        '<div style="font-size:min(34px,8.5vw);font-weight:800;margin:6px 0;white-space:nowrap">' + colonesDec(rp.monto) + '</div>' +
         '<div style="font-size:17px"><b>' + colonesDec(rp.monto / 2) + '</b> para cada uno</div>' +
         (rp.nota ? '<p class="nota">“' + esc(rp.nota) + '”</p>' : '') + '</div>' +
         '<div class="card pad" style="margin-top:8px"><div class="dato" style="border:0;padding:0"><span class="l">Disponible hoy</span><span class="v">' + colonesDec(r.disponible) + '</span></div>' +

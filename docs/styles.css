@@ -184,8 +184,15 @@ html.oscuro .entrar.oscuro { background: #0F0E0D; }
 .tiles > * { min-width: 0; }
 .tile b { overflow-wrap: anywhere; }
 @media (max-width: 360px) {
-  .tile b[style*="font-size:26px"] { font-size: 21px !important; }
   .tile b[style*="font-size:44px"] { font-size: 38px !important; }
   .top h1 { font-size: 28px; }
   .btn.chico { padding-left: 12px; padding-right: 12px; }
 }
+
+/* Monto del sobre: nunca se parte en dos líneas; se achica según el ancho del celular */
+.tile b.monto-grande { display: block; white-space: nowrap; overflow-wrap: normal; margin-top: 10px; line-height: 1.15;
+  font-size: min(26px, 6.4vw); letter-spacing: -0.02em; }
+.tile b.monto-grande small { font-size: 0.62em; font-weight: 700; margin-left: 1px; }
+.tile b.monto-grande span, .tile b.monto-grande small { display: inline; color: inherit; margin: 0; padding: 0; line-height: inherit; letter-spacing: inherit; text-transform: none; }
+.tile b.monto-grande span { font-size: 1em; font-weight: inherit; }
+.tile b.monto-grande small { font-size: 0.62em; font-weight: 700; }

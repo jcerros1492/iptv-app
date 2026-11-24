@@ -1,7 +1,7 @@
 {
-  "version": "3.7",
-  "fecha": "2026-11-23",
+  "version": "3.8",
+  "fecha": "2026-11-24",
   "cambios": [
-    "Notificaciones al celular"
+    "El monto del sobre ya no se parte en dos líneas"
   ]
 }

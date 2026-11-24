@@ -495,9 +495,13 @@ function accionPagarDeuda(db, config, p, hoy, correo) {
   var cambios = [], resto = monto, tolerancia = numero(config.tolerancia);
   var total = deudas.reduce(function (t, d) { return t + numero(d.Monto); }, 0);
   if (monto >= total - tolerancia) resto = total;            // dentro del margen: se salda todo
+  var cubre = [];
+  var MESES_ = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
+  var mesDe = function (f) { var x = String(f).split('-'); return x.length === 3 ? MESES_[Number(x[1]) - 1] : String(f); };
   deudas.forEach(function (d) {
     var m = numero(d.Monto);
     if (resto <= 0) return;
+    cubre.push(mesDe(d.Fecha) + (resto >= m ? '' : ' (abono)'));
     if (resto >= m) {
       cambios.push({ tabla: 'Cobros', op: 'actualizar', clave: 'ID', valor: d.ID, fila: { Estado: 'Saldado', Nota: [d.Nota, 'Pagado el ' + fechaCorta(hoy)].filter(Boolean).join(' · ') } });
       resto -= m;
@@ -511,14 +515,21 @@ function accionPagarDeuda(db, config, p, hoy, correo) {
     ID: nuevoId_('C', hoy, db.cobros) + 'd', Fecha: hoy, Usuario: p.usuario, Tipo: 'Pago de deuda',
     Dispositivos: '', Meses: 0, 'Regalía': 0, 'Créditos': 0, Monto: monto, Estado: 'Pagado',
     'Forma de pago': p.forma || 'SINPE', 'Cobró': socio, 'Tipo de cambio': '', Esperado: total, 'Vence nuevo': '',
-    'En sobre': p.enSobre === false ? 'No' : 'Sí', Comprobante: '',
+    'En sobre': p.enSobre === false ? 'No' : 'Sí', Comprobante: numComp,
     Nota: (deudas.length === 1 ? 'Deuda del ' + fechaCorta(deudas[0].Fecha) : 'Deudas del ' + deudas.map(function (d) { return fechaCorta(d.Fecha); }).join(', ')) +
       (monto >= total - tolerancia ? '' : ' · abono, faltan ' + colones(total - monto))
   };
   cambios.unshift({ tabla: 'Cobros', op: 'agregar', fila: fila });
   cambios.push({ tabla: 'Accesos', op: 'agregar', fila: { Fecha: hoy, Usuario: socio, 'Acción': 'Pago de deuda', Detalle: p.usuario + ' ' + colones(monto) } });
+  cambios.push({ tabla: 'Config', op: 'actualizar', clave: 'Clave', valor: 'ultimo_comprobante', fila: { Valor: numComp } });
   var pagadoDeuda = monto >= total - tolerancia ? total : monto;
-  return { resultado: { ok: true, queda: Math.max(0, Math.round((totalTodo - pagadoDeuda) * 100) / 100) }, cambios: cambios };
+  var queda = Math.max(0, Math.round((totalTodo - pagadoDeuda) * 100) / 100);
+  var cli = db.clientes.filter(function (c) { return c.Usuario === p.usuario; })[0] || {};
+  return { resultado: { ok: true, queda: queda, comprobante: {
+    tipo: 'deuda', numero: numComp, fecha: hoy, usuario: p.usuario, monto: monto, cubre: cubre, queda: queda,
+    forma: fila['Forma de pago'], recibio: socio, telefono: cli['Teléfono'] || '',
+    telefonos: { jonathan: config.telefono_jonathan, fernando: config.telefono_fernando }
+  } }, cambios: cambios };
 }
 
 function accionRespuesta(db, config, p, hoy, correo) {

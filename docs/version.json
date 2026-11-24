@@ -1,7 +1,8 @@
 {
-  "version": "3.8",
+  "version": "3.9",
   "fecha": "2026-11-24",
   "cambios": [
-    "El monto del sobre ya no se parte en dos líneas"
+    "Comprobante completo (ya no se corta)",
+    "Comprobante para abonos y pagos de deuda"
   ]
 }

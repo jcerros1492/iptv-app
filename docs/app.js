@@ -614,8 +614,32 @@
   }
 
   /* --- Comprobante --- */
+  function filasComprobante(k) {
+    if (k.tipo === 'deuda') {
+      var f = [['Usuario', k.usuario], ['Pagó', k.cubre && k.cubre.length ? k.cubre.join(', ') : 'Deuda pendiente']];
+      f.push(['Forma de pago', k.forma === 'SINPE' ? 'SINPE Móvil' : k.forma], ['Recibió', k.recibio]);
+      if (k.queda != null) f.push(k.queda > 0 ? ['Queda debiendo', colones(k.queda), 'naranja'] : ['Deuda', 'Saldada ✓', 'verde']);
+      return f;
+    }
+    return [['Usuario', k.usuario], ['Paquete', disp(k.dispositivos)],
+      ['Pagó', plural(k.meses, 'mes', 'meses') + (k.regalia ? ' +' + k.regalia + ' gratis' : ''), k.regalia ? 'naranja' : ''],
+      ['Vence el', fechaCorta(k.vence)], ['Forma de pago', (k.forma === 'SINPE' ? 'SINPE Móvil' : k.forma)], ['Recibió', k.recibio]];
+  }
   function pComprobante() {
     var k = S.comprobante; if (!k) return pInicio();
+    if (k.tipo === 'deuda') {
+      var col = { naranja: '#FF7A4D', verde: '#5BD38A' };
+      return '<div class="top"><div style="display:flex;gap:12px;align-items:center"><span class="icon-btn" style="background:var(--verde-bg);border:none;color:var(--verde)">' + ico('check') + '</span>' +
+        '<div><h1 style="font-size:20px">Pago guardado</h1><div class="nota">Este es el comprobante para el cliente</div></div></div></div>' +
+        '<div class="comp" id="comp"><div style="display:flex;justify-content:space-between"><div><div class="k">' + (k.queda > 0 ? 'COMPROBANTE DE ABONO' : 'COMPROBANTE DE PAGO') + '</div><div class="n">N.º ' + String(k.numero).padStart(4, '0') + ' · ' + fechaCorta(k.fecha) + '</div></div>' +
+        '<span class="chip" style="background:' + (k.queda > 0 ? '#9A4A12' : '#1F6B3A') + ';color:#fff;align-self:flex-start">' + (k.queda > 0 ? 'ABONO' : 'PAGADO') + '</span></div>' +
+        '<div class="m">' + colones(k.monto) + '</div>' +
+        filasComprobante(k).map(function (f) { return '<div class="r"><span>' + f[0] + '</span><span' + (f[2] ? ' style="color:' + col[f[2]] + '"' : '') + '>' + esc(f[1]) + '</span></div>'; }).join('') +
+        '<div class="g">¡Gracias por su pago!<small>Jonathan ' + esc(k.telefonos.jonathan) + ' · Fernando ' + esc(k.telefonos.fernando) + '</small></div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;margin-top:18px">' +
+        '<button class="btn verde" id="comp-wa">' + ico('wa', '') + 'Enviar foto por WhatsApp</button>' +
+        '<div class="dos"><button class="btn sec" id="comp-guardar">Guardar imagen</button><a class="btn sec" href="#/cliente/' + encodeURIComponent(k.usuario) + '">Listo</a></div></div>';
+    }
     var regalia = k.regalia ? ' <span style="color:#FF7A4D">+' + k.regalia + ' gratis</span>' : '';
     return '<div class="top"><div style="display:flex;gap:12px;align-items:center"><span class="icon-btn" style="background:var(--verde-bg);border:none;color:var(--verde)">' + ico('check') + '</span>' +
       '<div><h1 style="font-size:20px">Cobro guardado</h1><div class="nota">Este es el comprobante para el cliente</div></div></div></div>' +
@@ -633,28 +657,28 @@
       '<div class="dos"><button class="btn sec" id="comp-guardar">Guardar imagen</button><a class="btn sec" href="#/inicio">Listo</a></div></div>';
   }
   function dibujarComprobante(k) {
-    var W = 1080, H = 1200, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var filas = filasComprobante(k), deuda = k.tipo === 'deuda', abono = deuda && k.queda > 0;
+    // Alto según cuántas filas lleva, para que nunca se corte el pie
+    var W = 1080, H = 450 + filas.length * 110 + 40 + 200 + 90, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     var x = cv.getContext('2d');
     var F = '-apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif';
+    var col = { naranja: '#FF7A4D', verde: '#5BD38A' };
     x.fillStyle = '#0E1330'; x.fillRect(0, 0, W, H);
-    x.fillStyle = '#FF7A4D'; x.font = '700 34px ' + F; x.fillText('COMPROBANTE DE PAGO', 90, 150);
-    x.fillStyle = '#C9CEEA'; x.font = '400 32px ' + F; x.fillText('N.º ' + String(k.numero).padStart(4, '0') + ' · ' + fechaCorta(k.fecha), 90, 200);
-    x.fillStyle = '#1F6B3A'; redondo(x, W - 290, 110, 200, 64, 32); x.fill();
-    x.fillStyle = '#fff'; x.font = '700 30px ' + F; x.textAlign = 'center'; x.fillText('PAGADO', W - 190, 153); x.textAlign = 'left';
+    x.fillStyle = '#FF7A4D'; x.font = '700 34px ' + F; x.fillText(abono ? 'COMPROBANTE DE ABONO' : 'COMPROBANTE DE PAGO', 90, 150);
+    x.fillStyle = '#C9CEEA'; x.font = '400 32px ' + F; x.fillText('N.º ' + String(k.numero || 0).padStart(4, '0') + ' · ' + fechaCorta(k.fecha), 90, 200);
+    x.fillStyle = abono ? '#9A4A12' : '#1F6B3A'; redondo(x, W - 290, 110, 200, 64, 32); x.fill();
+    x.fillStyle = '#fff'; x.font = '700 30px ' + F; x.textAlign = 'center'; x.fillText(abono ? 'ABONO' : 'PAGADO', W - 190, 153); x.textAlign = 'left';
     x.fillStyle = '#fff'; x.font = '700 120px ' + F; x.fillText(colones(k.monto), 90, 370);
-    var filas = [['Usuario', k.usuario], ['Paquete', disp(k.dispositivos)],
-      ['Pagó', plural(k.meses, 'mes', 'meses') + (k.regalia ? ' +' + k.regalia + ' gratis' : '')],
-      ['Vence el', fechaCorta(k.vence)], ['Forma de pago', (k.forma === 'SINPE' ? 'SINPE Móvil' : k.forma)], ['Recibió', k.recibio]];
     var y = 450;
     filas.forEach(function (f) {
       x.strokeStyle = '#2A3366'; x.lineWidth = 2; x.beginPath(); x.moveTo(90, y); x.lineTo(W - 90, y); x.stroke();
       x.fillStyle = '#C9CEEA'; x.font = '400 38px ' + F; x.fillText(f[0], 90, y + 70);
-      x.fillStyle = f[0] === 'Pagó' && k.regalia ? '#FF7A4D' : '#fff'; x.font = '700 40px ' + F; x.textAlign = 'right'; x.fillText(f[1], W - 90, y + 70); x.textAlign = 'left';
+      x.fillStyle = f[2] ? col[f[2]] : '#fff'; x.font = '700 40px ' + F; x.textAlign = 'right'; x.fillText(f[1], W - 90, y + 70, W - 520); x.textAlign = 'left';
       y += 110;
     });
     x.fillStyle = '#1A2250'; redondo(x, 90, y + 40, W - 180, 200, 30); x.fill();
     x.fillStyle = '#fff'; x.font = '700 46px ' + F; x.fillText('¡Gracias por su pago!', 140, y + 125);
-    x.fillStyle = '#C9CEEA'; x.font = '400 34px ' + F; x.fillText('Jonathan ' + k.telefonos.jonathan + '  ·  Fernando ' + k.telefonos.fernando, 140, y + 190);
+    x.fillStyle = '#C9CEEA'; x.font = '400 34px ' + F; x.fillText('Jonathan ' + k.telefonos.jonathan + '  ·  Fernando ' + k.telefonos.fernando, 140, y + 190, W - 280);
     return new Promise(function (ok) { cv.toBlob(ok, 'image/png'); });
   }
   function redondo(x, a, b, w, h, r) {
@@ -1382,6 +1406,12 @@
       todos('[data-comp]', function (b) {
         b.onclick = function () {
           var x = S.datos.cobros.filter(function (c) { return c.ID === b.dataset.comp; })[0], c = cliente(u);
+          if (x.Tipo === 'Pago de deuda') {
+            S.comprobante = { tipo: 'deuda', numero: x.Comprobante, fecha: x.Fecha, usuario: u, monto: numero(x.Monto),
+              cubre: [String(x.Nota || 'Deuda pendiente').split(' · ')[0]], queda: null, forma: x['Forma de pago'], recibio: x['Cobró'], telefono: c.telefono,
+              telefonos: { jonathan: S.datos.config.telefono_jonathan, fernando: S.datos.config.telefono_fernando } };
+            ir('#/comprobante'); return;
+          }
           S.comprobante = { numero: x.Comprobante, fecha: x.Fecha, usuario: u, dispositivos: x.Dispositivos, meses: numero(x.Meses), regalia: numero(x['Regalía']),
             vence: x['Vence nuevo'], monto: numero(x.Monto), forma: x['Forma de pago'], recibio: x['Cobró'], telefono: c.telefono,
             telefonos: { jonathan: S.datos.config.telefono_jonathan, fernando: S.datos.config.telefono_fernando } };
@@ -1656,7 +1686,8 @@
           return refrescar().then(function () {
             S.deuda = null;
             toast(r.queda > 0 ? 'Pago guardado. Queda debiendo ' + colones(r.queda) : 'Deuda pagada ✓');
-            ir('#/cliente/' + encodeURIComponent(arg));
+            if (r.comprobante) { S.comprobante = r.comprobante; ir('#/comprobante'); }
+            else ir('#/cliente/' + encodeURIComponent(arg));
           });
         });
       };

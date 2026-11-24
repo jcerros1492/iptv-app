@@ -4,6 +4,16 @@ Cada zip trae el número de versión en el nombre (iptv-app-vX.X.zip).
 "Motor" = Apps Script. Si dice "sí", hay que copiar el archivo indicado a Apps Script y hacer
 Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.
 
+## 3.9 · 24 nov 2026
+- Comprobante: la imagen ya no se corta abajo ("¡Gracias por su pago!" y los teléfonos se ven
+  completos). El alto se ajusta solo a lo que lleva.
+- Nuevo: comprobante para pagos de deuda y abonos. Después de guardar el pago se abre igual que
+  en una renovación. Dice qué meses pagó, y si es abono lleva el sello naranja ABONO y
+  "Queda debiendo ₡…"; si salda todo, "Deuda: Saldada ✓". Se puede volver a mandar desde el
+  historial del cliente.
+- Tema oscuro: el botón rojo "Quitar" (y los demás rojos) ahora se ven en rojo claro.
+- Motor: SÍ → copiar Logica.gs a Apps Script y hacer Nueva versión.
+
 ## 3.8 · 24 nov 2026
 - Finanzas: el monto del sobre (₡192.762,92) queda siempre en una sola línea; los céntimos se
   ven más pequeños y el tamaño se ajusta al ancho de cada celular.

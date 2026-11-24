@@ -196,3 +196,4 @@ html.oscuro .entrar.oscuro { background: #0F0E0D; }
 .tile b.monto-grande span, .tile b.monto-grande small { display: inline; color: inherit; margin: 0; padding: 0; line-height: inherit; letter-spacing: inherit; text-transform: none; }
 .tile b.monto-grande span { font-size: 1em; font-weight: inherit; }
 .tile b.monto-grande small { font-size: 0.62em; font-weight: 700; }
+html.oscuro .btn.rojo { background: transparent; color: #F87171; border-color: #7F2A2A; }
